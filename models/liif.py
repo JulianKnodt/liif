@@ -9,26 +9,19 @@ from utils import make_coord
 
 @register('liif')
 class LIIF(nn.Module):
-
-    def __init__(self, encoder_spec, imnet_spec=None,
-                 local_ensemble=True, feat_unfold=True, cell_decode=True):
+    def __init__(
+      self,
+      encoder_spec,
+      local_ensemble=True,
+      feat_unfold=True,
+      cell_decode=True,
+    ):
         super().__init__()
         self.local_ensemble = local_ensemble
         self.feat_unfold = feat_unfold
         self.cell_decode = cell_decode
 
         self.encoder = models.make(encoder_spec)
-
-        if imnet_spec is not None:
-            imnet_in_dim = self.encoder.out_dim
-            if self.feat_unfold:
-                imnet_in_dim *= 9
-            imnet_in_dim += 2 # attach coord
-            if self.cell_decode:
-                imnet_in_dim += 2
-            self.imnet = models.make(imnet_spec, args={'in_dim': imnet_in_dim})
-        else:
-            self.imnet = None
 
     def gen_feat(self, inp):
         self.feat = self.encoder(inp)
@@ -38,10 +31,9 @@ class LIIF(nn.Module):
         feat = self.feat
 
         if self.imnet is None:
-            ret = F.grid_sample(feat, coord.flip(-1).unsqueeze(1),
-                mode='nearest', align_corners=False)[:, :, 0, :] \
-                .permute(0, 2, 1)
-            return ret
+            return F.grid_sample(
+              feat, coord.flip(-1).unsqueeze(1), mode='nearest', align_corners=False
+            )[:, :, 0, :].permute(0, 2, 1)
 
         if self.feat_unfold:
             feat = F.unfold(feat, 3, padding=1).view(
@@ -55,12 +47,12 @@ class LIIF(nn.Module):
             vx_lst, vy_lst, eps_shift = [0], [0], 0
 
         # field radius (global: [-1, 1])
-        rx = 2 / feat.shape[-2] / 2
-        ry = 2 / feat.shape[-1] / 2
+        rx, ry = [(2/r)/2 for r in feat.shape[2:]]
 
-        feat_coord = make_coord(feat.shape[-2:], flatten=False).cuda() \
-            .permute(2, 0, 1) \
-            .unsqueeze(0).expand(feat.shape[0], 2, *feat.shape[-2:])
+        feat_coord = make_coord(feat.shape[-2:], flatten=False, device=coord.device)\
+            .permute(2, 0, 1)\
+            .unsqueeze(0)\
+            .expand(feat.shape[0], 2, *feat.shape[-2:])
 
         preds = []
         areas = []

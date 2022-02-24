@@ -6,7 +6,6 @@ import math
 import torch
 import numpy as np
 from torch.optim import SGD, Adam
-from tensorboardX import SummaryWriter
 
 
 class Averager():
@@ -24,24 +23,15 @@ class Averager():
 
 
 class Timer():
-
-    def __init__(self):
-        self.v = time.time()
-
-    def s(self):
-        self.v = time.time()
-
-    def t(self):
-        return time.time() - self.v
+    def __init__(self): self.v = time.time()
+    def s(self): self.v = time.time()
+    def t(self): return time.time() - self.v
 
 
 def time_text(t):
-    if t >= 3600:
-        return '{:.1f}h'.format(t / 3600)
-    elif t >= 60:
-        return '{:.1f}m'.format(t / 60)
-    else:
-        return '{:.1f}s'.format(t)
+    if t >= 3600: return '{:.1f}h'.format(t / 3600)
+    elif t >= 60: return '{:.1f}m'.format(t / 60)
+    else: return '{:.1f}s'.format(t)
 
 
 _log_path = None
@@ -70,13 +60,6 @@ def ensure_path(path, remove=True):
         os.makedirs(path)
 
 
-def set_save_path(save_path, remove=True):
-    ensure_path(save_path, remove=remove)
-    set_log_path(save_path)
-    writer = SummaryWriter(os.path.join(save_path, 'tensorboard'))
-    return log, writer
-
-
 def compute_num_params(model, text=False):
     tot = int(sum([np.prod(p.shape) for p in model.parameters()]))
     if text:
@@ -99,21 +82,17 @@ def make_optimizer(param_list, optimizer_spec, load_sd=False):
     return optimizer
 
 
-def make_coord(shape, ranges=None, flatten=True):
+def make_coord(shape, ranges=None, flatten=True, device="cuda"):
     """ Make coordinates at grid centers.
     """
     coord_seqs = []
     for i, n in enumerate(shape):
-        if ranges is None:
-            v0, v1 = -1, 1
-        else:
-            v0, v1 = ranges[i]
+        v0, v1 = (-1, 1) if ranges is None else ranges[i]
         r = (v1 - v0) / (2 * n)
-        seq = v0 + r + (2 * r) * torch.arange(n).float()
+        seq = v0 + r + (2 * r) * torch.arange(n, device=device).float()
         coord_seqs.append(seq)
     ret = torch.stack(torch.meshgrid(*coord_seqs), dim=-1)
-    if flatten:
-        ret = ret.view(-1, ret.shape[-1])
+    if flatten: ret = ret.view(-1, ret.shape[-1])
     return ret
 
 
