@@ -4,7 +4,7 @@ train_dataset:
     args:
       root_path: ./load/div2k/DIV2K_train_HR
       repeat: 20
-      cache: in_memory
+      #cache: in_memory
   wrapper:
     name: sr-implicit-downsampled
     args:
@@ -44,7 +44,7 @@ model:
     imnet_spec:
       name: mlp
       args:
-        out_dim: 3
+        out: 3
         hidden_list: [256, 256, 256, 256]
 
 optimizer:

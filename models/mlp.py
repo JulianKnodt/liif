@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torchz
 
 from models import register
 
@@ -18,14 +19,14 @@ class MLP(nn.Module):
     def __init__(
         self,
         hidden_list=[256] * 3,
-        in_dim=3,
+        in_size=580,
         out=3,
         skip=3,
         activation=nn.LeakyReLU(inplace=True),
         init=None,
     ):
         assert init in mlp_init_kinds, "Must use init kind"
-        super(SkipConnMLP, self).__init__()
+        super(MLP, self).__init__()
         self.in_size = in_size
         num_layers = len(hidden_list)
         hidden_size = max(hidden_list)

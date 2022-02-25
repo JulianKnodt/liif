@@ -27,7 +27,7 @@ import os
 import yaml
 import torch
 import torch.nn as nn
-from tqdm import trange
+from tqdm import trange, tqdm
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
 
@@ -46,7 +46,7 @@ def make_data_loader(spec, tag=''):
   loader = DataLoader(
     dataset, batch_size=spec['batch_size'],
     shuffle=(tag == 'train'),
-    num_workers=8,
+    num_workers=1,
     pin_memory=True
   )
   return loader
@@ -112,7 +112,7 @@ def main(config_, save_path):
 
     train_loader = make_data_loader(config.get('train_dataset'), tag='train')
     val_loader = make_data_loader(config.get('val_dataset'), tag='val')
-    print("[note]: Making loaders")
+    print("[note]: Made loaders")
     if config.get('data_norm') is None:
         config['data_norm'] = { 'inp': {'sub': [0], 'div': [1]}, 'gt': {'sub': [0], 'div': [1]} }
 

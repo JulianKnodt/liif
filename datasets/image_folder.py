@@ -14,7 +14,6 @@ from datasets import register
 
 @register('image-folder')
 class ImageFolder(Dataset):
-
     def __init__(self, root_path, split_file=None, split_key=None, first_k=None,
                  repeat=1, cache='none'):
         self.repeat = repeat

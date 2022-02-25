@@ -12,6 +12,7 @@ class LIIF(nn.Module):
     def __init__(
       self,
       encoder_spec,
+      imnet_spec,
       local_ensemble=True,
       feat_unfold=True,
       cell_decode=True,
@@ -22,6 +23,7 @@ class LIIF(nn.Module):
         self.cell_decode = cell_decode
 
         self.encoder = models.make(encoder_spec)
+        self.imnet = models.make(imnet_spec)
 
     def gen_feat(self, inp):
         self.feat = self.encoder(inp)
@@ -29,11 +31,6 @@ class LIIF(nn.Module):
 
     def query_rgb(self, coord, cell=None):
         feat = self.feat
-
-        if self.imnet is None:
-            return F.grid_sample(
-              feat, coord.flip(-1).unsqueeze(1), mode='nearest', align_corners=False
-            )[:, :, 0, :].permute(0, 2, 1)
 
         if self.feat_unfold:
             feat = F.unfold(feat, 3, padding=1).view(
@@ -49,7 +46,7 @@ class LIIF(nn.Module):
         # field radius (global: [-1, 1])
         rx, ry = [(2/r)/2 for r in feat.shape[2:]]
 
-        feat_coord = make_coord(feat.shape[-2:], flatten=False, device=coord.device)\
+        feat_coord = make_coord(feat.shape[-2:], flatten=False).cuda()\
             .permute(2, 0, 1)\
             .unsqueeze(0)\
             .expand(feat.shape[0], 2, *feat.shape[-2:])
