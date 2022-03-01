@@ -80,7 +80,7 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None, ve
       res = metric_fn(pred, batch['gt'])
       val_res.add(res.item(), inp.shape[0])
 
-      if verbose: progress.set_postfix(PSNR=f"{val_res.item():.4f}")
+      progress.set_postfix(PSNR=f"{val_res.item():.4f}")
     return val_res.item()
 
 

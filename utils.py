@@ -19,6 +19,16 @@ class Averager():
 
   def item(self): return self.v
 
+class MovingAverager():
+  def __init__(self, time_decay=0.8, init=None):
+    self.decay = time_decay
+    self.v = init
+
+  def add(self, v):
+    self.v = v if self.v is None else (self.v * self.decay + v * (1-self.decay))
+
+  def item(self): return self.v
+
 
 class Timer():
   def __init__(self): self.v = time.time()

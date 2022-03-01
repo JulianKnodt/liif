@@ -38,20 +38,24 @@ class LIIF(nn.Module):
         f0, f1, f2, f3 = feat.shape
         feat = F.unfold(feat, 3, padding=1).reshape(f0, f1 * 9, f2, f3)
 
+      vx_lst, vy_lst, eps_shift = [0], [0], 0
       if self.local_ensemble:
         vx_lst = [-1, 1]
         vy_lst = [-1, 1]
         eps_shift = 1e-6
-      else:
-        vx_lst, vy_lst, eps_shift = [0], [0], 0
+
+      hw = torch.tensor(feat.shape[-2:], device=coord.device, dtype=torch.float)
 
       # field radius (global: [-1, 1])
-      rx, ry = [(2/r)/2 for r in feat.shape[2:]]
+      rx, ry = [2/r/2 for r in feat.shape[2:]]
 
       feat_coord = make_coord(feat.shape[-2:], flatten=False).cuda()\
-        .permute(2, 0, 1)\
-        .unsqueeze(0)\
+        .permute(2, 0, 1)[None]\
         .expand(feat.shape[0], 2, *feat.shape[-2:])
+
+      if self.cell_decode:
+        rel_cell = cell.clone()
+        rel_cell[..., :] *= hw
 
       preds = []
       areas = []
@@ -61,41 +65,88 @@ class LIIF(nn.Module):
           coord_[:, :, 0] += vx * rx + eps_shift
           coord_[:, :, 1] += vy * ry + eps_shift
           coord_.clamp_(min=-1 + 1e-6, max=1 - 1e-6)
+          sample_coord = coord_.flip(-1).unsqueeze(1)
           q_feat = F.grid_sample(
-            feat, coord_.flip(-1).unsqueeze(1),
-            mode='nearest', align_corners=False,
+            feat,
+            sample_coord,
+            mode='nearest',
+            align_corners=False,
           )[:, :, 0, :].permute(0, 2, 1)
           q_coord = F.grid_sample(
-            feat_coord, coord_.flip(-1).unsqueeze(1),
-            mode='nearest', align_corners=False,
+            feat_coord,
+            sample_coord,
+            mode='nearest',
+            align_corners=False,
           )[:, :, 0, :].permute(0, 2, 1)
           rel_coord = coord - q_coord
-          rel_coord[:, :, 0] *= feat.shape[-2]
-          rel_coord[:, :, 1] *= feat.shape[-1]
+          rel_coord[..., :] *= hw
           inp = torch.cat([q_feat, rel_coord], dim=-1)
 
-          if self.cell_decode:
-            rel_cell = cell.clone()
+          if self.cell_decode: inp = torch.cat([inp, rel_cell], dim=-1)
 
-            rel_cell[:, :, 0] *= feat.shape[-2]
-            rel_cell[:, :, 1] *= feat.shape[-1]
-            inp = torch.cat([inp, rel_cell], dim=-1)
+          preds.append(self.imnet(inp))
+          areas.append(torch.abs(rel_coord.prod(dim=-1, keepdim=True)) + 1e-9)
 
-          bs, q = coord.shape[:2]
-          pred = self.imnet(inp.view(bs * q, -1)).view(bs, q, -1)
+      areas = torch.stack(areas, dim=0)
+      areas = areas/areas.sum(dim=0, keepdim=True)
+      if self.local_ensemble: areas[[0,1,2,3]] = areas[[3,2,1,0]]
+      preds = torch.stack(preds, dim=0)
+      return (preds * areas).sum(dim=0)
 
-          preds.append(pred)
+    def query_rgb2(self, coord, cell):
+      feat = self.feat
 
-          area = torch.abs(rel_coord[:, :, 0] * rel_coord[:, :, 1])
-          areas.append(area + 1e-9)
+      f0, f1, f2, f3 = feat.shape
+      feat = F.unfold(feat, 3, padding=1).reshape(f0, f1 * 9, f2, f3)
 
-      tot_area = torch.stack(areas).sum(dim=0)
+      offsets = torch.tensor([[0,0],[0,1],[1,0],[1,1]],dtype=torch.float,device=coord.device)
+      rad = torch.tensor([2/r/2 for r in feat.shape[2:]],device=coord.device,dtype=torch.float)
+
+      feat_coord = make_coord(feat.shape[-2:], flatten=False).cuda()\
+        .permute(2, 0, 1).unsqueeze(0)\
+        .expand(feat.shape[0], 2, *feat.shape[-2:])
+
+      if self.cell_decode:
+        rel_cell = cell.clone()
+        rel_cell[:, :, 0] *= feat.shape[-2]
+        rel_cell[:, :, 1] *= feat.shape[-1]
+
+      # TODO maybe this shouldn't be a long a batch dim but along another dimension?
+      # where is the bug coming from?
+      ensemble_coords = coord[None] + (offsets * rad[None])[:, None, None, :]
+
+      ensemble_coords.clamp_(min=-1+1e-6, max=1-1e-6)
+      sample_coords = ensemble_coords.reshape(-1, *coord.shape[1:]).flip(-1).unsqueeze(1)
+      q_feat = F.grid_sample(
+        feat.repeat_interleave(4, dim=0,output_size=sample_coords.shape[0]),
+        sample_coords,
+        mode='nearest',
+        align_corners=False,
+      )[:, :, 0, :].permute(0, 2, 1).reshape(4, *coord.shape[:-1], -1)
+      q_coord = F.grid_sample(
+        feat_coord.repeat_interleave(4, dim=0,output_size=sample_coords.shape[0]),
+        sample_coords,
+        mode='nearest',
+        align_corners=False,
+      )[:, :, 0, :].permute(0, 2, 1).reshape(4, *coord.shape)
+
+      rel_coord = coord[None] - q_coord
+      rel_coord[..., 0] *= feat.shape[-2]
+      rel_coord[..., 1] *= feat.shape[-1]
+      inp = torch.cat([q_feat, rel_coord], dim=-1)
+
+      if self.cell_decode: inp = torch.cat([inp, rel_cell[None].expand_as(rel_coord)], dim=-1)
+
+      pred = self.imnet(inp)
+      areas = torch.abs(rel_coord.prod(dim=-1, keepdim=True)) + 1e-9
+
+      tot_area = areas.sum(dim=0, keepdim=True)
+      areas = areas/tot_area
+      # Why does this exist?
       if self.local_ensemble:
-        t = areas[0]; areas[0] = areas[3]; areas[3] = t
-        t = areas[1]; areas[1] = areas[2]; areas[2] = t
-      ret = 0
-      for pred, area in zip(preds, areas): ret = ret + pred * (area / tot_area).unsqueeze(-1)
-      return ret
+        areas[[0,3]] = areas[[3,0]]
+        areas[[1,2]] = areas[[2,1]]
+      return (pred * areas).sum(dim=0)
 
     def query_rgb_bezier(self, coord, cell):
       ...

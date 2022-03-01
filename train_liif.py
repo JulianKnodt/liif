@@ -73,7 +73,7 @@ def prepare_training():
 def train(train_loader, model, optimizer):
   model.train()
   loss_fn = nn.MSELoss()
-  train_loss = utils.Averager()
+  train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']
   t = data_norm['inp']
@@ -83,7 +83,8 @@ def train(train_loader, model, optimizer):
   gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
   gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
 
-  for batch in tqdm(train_loader, leave=False, desc='train'):
+  progress = tqdm(train_loader, leave=False, desc='train')
+  for batch in progress:
     for k, v in batch.items(): batch[k] = v.cuda()
 
     inp = (batch['inp'] - inp_sub) / inp_div
@@ -97,6 +98,8 @@ def train(train_loader, model, optimizer):
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+
+    progress.set_postfix(L=train_loss.item())
 
   return train_loss.item()
 
@@ -141,35 +144,37 @@ def main(config_, save_path):
         optimizer_spec = config['optimizer']
         optimizer_spec['sd'] = optimizer.state_dict()
         sv_file = {
-            'model': model_spec,
-            'optimizer': optimizer_spec,
-            'epoch': epoch
+          'model': model_spec,
+          'optimizer': optimizer_spec,
+          'epoch': epoch
         }
 
         torch.save(sv_file, os.path.join(save_path, 'epoch-last.pth'))
 
         if (epoch_save is not None) and (epoch % epoch_save == 0):
-            torch.save(sv_file,
-                os.path.join(save_path, 'epoch-{}.pth'.format(epoch)))
+            torch.save(sv_file, os.path.join(save_path, f'epoch-{epoch}.pth'))
 
         if (epoch_val is not None) and (epoch % epoch_val == 0):
             model_ = model
             if n_gpus > 1 and (config.get('eval_bsize') is not None): model_ = model.module
-            val_res = eval_psnr(val_loader, model_,
-                data_norm=config['data_norm'],
-                eval_type=config.get('eval_type'),
-                eval_bsize=config.get('eval_bsize'))
+            val_res = eval_psnr(
+              val_loader,
+              model_,
+              data_norm=config['data_norm'],
+              eval_type=config.get('eval_type'),
+              eval_bsize=config.get('eval_bsize')
+            )
 
-            log_info.append('val: psnr={:.4f}'.format(val_res))
+            log_info.append(f'val: psnr={val_res:.4f}')
             if val_res > max_val_v:
-                max_val_v = val_res
-                torch.save(sv_file, os.path.join(save_path, 'epoch-best.pth'))
+              max_val_v = val_res
+              torch.save(sv_file, os.path.join(save_path, 'epoch-best.pth'))
 
         t = timer.t()
         prog = (epoch - epoch_start + 1) / (epoch_max - epoch_start + 1)
         t_epoch = utils.time_text(t - t_epoch_start)
         t_elapsed, t_all = utils.time_text(t), utils.time_text(t / prog)
-        log_info.append('{} {}/{}'.format(t_epoch, t_elapsed, t_all))
+        log_info.append(f'{t_epoch} {t_elapsed}/{t_all}')
 
 
 if __name__ == '__main__':

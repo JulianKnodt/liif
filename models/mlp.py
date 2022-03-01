@@ -18,7 +18,7 @@ class MLP(nn.Module):
   def __init__(
     self,
     hidden_list=[256] * 3,
-    in_size=580,
+    in_size=292,
     out=3,
     skip=3,
     activation=nn.LeakyReLU(inplace=True),
