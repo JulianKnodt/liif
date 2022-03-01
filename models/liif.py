@@ -66,18 +66,14 @@ class LIIF(nn.Module):
           coord_[:, :, 1] += vy * ry + eps_shift
           coord_.clamp_(min=-1 + 1e-6, max=1 - 1e-6)
           sample_coord = coord_.flip(-1).unsqueeze(1)
-          q_feat = F.grid_sample(
-            feat,
+          qs = F.grid_sample(
+            torch.cat([feat, feat_coord], dim=1),
             sample_coord,
             mode='nearest',
+            padding_mode="reflection",
             align_corners=False,
           )[:, :, 0, :].permute(0, 2, 1)
-          q_coord = F.grid_sample(
-            feat_coord,
-            sample_coord,
-            mode='nearest',
-            align_corners=False,
-          )[:, :, 0, :].permute(0, 2, 1)
+          q_feat, q_coord = qs[..., :-2], qs[..., -2:]
           rel_coord = coord - q_coord
           rel_coord[..., :] *= hw
           inp = torch.cat([q_feat, rel_coord], dim=-1)
