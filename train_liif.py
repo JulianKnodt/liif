@@ -1,24 +1,24 @@
 """ Train for generating LIIF, from image to implicit representation.
 
-    Config:
-        train_dataset:
-          dataset: $spec; wrapper: $spec; batch_size:
-        val_dataset:
-          dataset: $spec; wrapper: $spec; batch_size:
-        (data_norm):
-            inp: {sub: []; div: []}
-            gt: {sub: []; div: []}
-        (eval_type):
-        (eval_bsize):
+  Config:
+      train_dataset:
+        dataset: $spec; wrapper: $spec; batch_size:
+      val_dataset:
+        dataset: $spec; wrapper: $spec; batch_size:
+      (data_norm):
+          inp: {sub: []; div: []}
+          gt: {sub: []; div: []}
+      (eval_type):
+      (eval_bsize):
 
-        model: $spec
-        optimizer: $spec
-        epoch_max:
-        (multi_step_lr):
-            milestones: []; gamma: 0.5
-        (resume): *.pth
+      model: $spec
+      optimizer: $spec
+      epoch_max:
+      (multi_step_lr):
+          milestones: []; gamma: 0.5
+      (resume): *.pth
 
-        (epoch_val): ; (epoch_save):
+      (epoch_val): ; (epoch_save):
 """
 
 import argparse
@@ -71,37 +71,34 @@ def prepare_training():
 
 
 def train(train_loader, model, optimizer):
-    model.train()
-    loss_fn = nn.L1Loss()
-    train_loss = utils.Averager()
+  model.train()
+  loss_fn = nn.MSELoss()
+  train_loss = utils.Averager()
 
-    data_norm = config['data_norm']
-    t = data_norm['inp']
-    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1).cuda()
-    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1).cuda()
-    t = data_norm['gt']
-    gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
-    gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
+  data_norm = config['data_norm']
+  t = data_norm['inp']
+  inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1).cuda()
+  inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1).cuda()
+  t = data_norm['gt']
+  gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
+  gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
 
-    for batch in tqdm(train_loader, leave=False, desc='train'):
-        for k, v in batch.items():
-            batch[k] = v.cuda()
+  for batch in tqdm(train_loader, leave=False, desc='train'):
+    for k, v in batch.items(): batch[k] = v.cuda()
 
-        inp = (batch['inp'] - inp_sub) / inp_div
-        pred = model(inp, batch['coord'], batch['cell'])
+    inp = (batch['inp'] - inp_sub) / inp_div
+    pred = model(inp, batch['coord'], batch['cell'])
 
-        gt = (batch['gt'] - gt_sub) / gt_div
-        loss = loss_fn(pred, gt)
+    gt = (batch['gt'] - gt_sub) / gt_div
+    loss = loss_fn(pred, gt)
 
-        train_loss.add(loss.item())
+    train_loss.add(loss.item())
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
 
-        pred = None; loss = None
-
-    return train_loss.item()
+  return train_loss.item()
 
 
 def main(config_, save_path):
