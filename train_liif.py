@@ -129,7 +129,7 @@ def main(config_, save_path):
 
     timer = utils.Timer()
 
-    for epoch in trange(epoch_start, epoch_max + 1):
+    for epoch in range(epoch_start, epoch_max + 1):
         t_epoch_start = timer.t()
         log_info = ['epoch {}/{}'.format(epoch, epoch_max)]
 
@@ -138,10 +138,7 @@ def main(config_, save_path):
             lr_scheduler.step()
 
         log_info.append('train: loss={:.4f}'.format(train_loss))
-        if n_gpus > 1:
-            model_ = model.module
-        else:
-            model_ = model
+        model_ = model.module if n_gpus > 1 else model_
         model_spec = config['model']
         model_spec['sd'] = model_.state_dict()
         optimizer_spec = config['optimizer']
@@ -159,10 +156,8 @@ def main(config_, save_path):
                 os.path.join(save_path, 'epoch-{}.pth'.format(epoch)))
 
         if (epoch_val is not None) and (epoch % epoch_val == 0):
-            if n_gpus > 1 and (config.get('eval_bsize') is not None):
-                model_ = model.module
-            else:
-                model_ = model
+            model_ = model
+            if n_gpus > 1 and (config.get('eval_bsize') is not None): model_ = model.module
             val_res = eval_psnr(val_loader, model_,
                 data_norm=config['data_norm'],
                 eval_type=config.get('eval_type'),

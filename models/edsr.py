@@ -29,55 +29,44 @@ class MeanShift(nn.Conv2d):
 
 class ResBlock(nn.Module):
     def __init__(
-        self, conv, n_feats, kernel_size,
-        bias=True, bn=False, act=nn.ReLU(True), res_scale=1):
+      self,
+      conv,
+      n_feats,
+      kernel_size,
+      bias=True,
+      bn=False,
+      act=nn.ReLU(True),
+      res_scale=1,
+    ):
+      super(ResBlock, self).__init__()
+      m = []
+      for i in range(2):
+          m.append(conv(n_feats, n_feats, kernel_size, bias=bias))
+          if bn: m.append(nn.BatchNorm2d(n_feats))
+          if i == 0: m.append(act)
 
-        super(ResBlock, self).__init__()
-        m = []
-        for i in range(2):
-            m.append(conv(n_feats, n_feats, kernel_size, bias=bias))
-            if bn:
-                m.append(nn.BatchNorm2d(n_feats))
-            if i == 0:
-                m.append(act)
+      self.body = nn.Sequential(*m)
+      self.res_scale = res_scale
 
-        self.body = nn.Sequential(*m)
-        self.res_scale = res_scale
-
-    def forward(self, x):
-        res = self.body(x).mul(self.res_scale)
-        res += x
-
-        return res
+    def forward(self, x): return x.add(self.body(x), alpha=self.res_scale)
 
 class Upsampler(nn.Sequential):
-    def __init__(self, conv, scale, n_feats, bn=False, act=False, bias=True):
-
-        m = []
-        if (scale & (scale - 1)) == 0:    # Is scale = 2^n?
-            for _ in range(int(math.log(scale, 2))):
-                m.append(conv(n_feats, 4 * n_feats, 3, bias))
-                m.append(nn.PixelShuffle(2))
-                if bn:
-                    m.append(nn.BatchNorm2d(n_feats))
-                if act == 'relu':
-                    m.append(nn.ReLU(True))
-                elif act == 'prelu':
-                    m.append(nn.PReLU(n_feats))
-
-        elif scale == 3:
-            m.append(conv(n_feats, 9 * n_feats, 3, bias))
-            m.append(nn.PixelShuffle(3))
-            if bn:
-                m.append(nn.BatchNorm2d(n_feats))
-            if act == 'relu':
-                m.append(nn.ReLU(True))
-            elif act == 'prelu':
-                m.append(nn.PReLU(n_feats))
-        else:
-            raise NotImplementedError
-
-        super(Upsampler, self).__init__(*m)
+  def __init__(self, conv, scale, n_feats, bn=False, act=False, bias=True):
+    m = []
+    # Is scale = 2^n?
+    if (scale & (scale - 1)) == 0:
+      for _ in range(int(math.log(scale, 2))):
+        m.append(conv(n_feats, 4 * n_feats, 3, bias))
+        m.append(nn.PixelShuffle(2))
+        if bn: m.append(nn.BatchNorm2d(n_feats))
+    elif scale == 3:
+      m.append(conv(n_feats, 9 * n_feats, 3, bias))
+      m.append(nn.PixelShuffle(3))
+    else: raise NotImplementedError
+    if bn: m.append(nn.BatchNorm2d(n_feats))
+    if act == 'relu': m.append(nn.ReLU(True))
+    elif act == 'prelu': m.append(nn.PReLU(n_feats))
+    super(Upsampler, self).__init__(*m)
 
 
 url = {
@@ -99,10 +88,8 @@ class EDSR(nn.Module):
         scale = args.scale[0]
         act = nn.ReLU(True)
         url_name = 'r{}f{}x{}'.format(n_resblocks, n_feats, scale)
-        if url_name in url:
-            self.url = url[url_name]
-        else:
-            self.url = None
+        self.url = url.get(url_name, None)
+
         self.sub_mean = MeanShift(args.rgb_range)
         self.add_mean = MeanShift(args.rgb_range, sign=1)
 
@@ -111,39 +98,26 @@ class EDSR(nn.Module):
 
         # define body module
         m_body = [
-            ResBlock(
-                conv, n_feats, kernel_size, act=act, res_scale=args.res_scale
-            ) for _ in range(n_resblocks)
+          ResBlock(conv, n_feats, kernel_size, act=act, res_scale=args.res_scale)
+          for _ in range(n_resblocks)
         ]
         m_body.append(conv(n_feats, n_feats, kernel_size))
 
         self.head = nn.Sequential(*m_head)
         self.body = nn.Sequential(*m_body)
 
-        if args.no_upsampling:
-            self.out_dim = n_feats
+        if args.no_upsampling: self.out_dim = n_feats
         else:
-            self.out_dim = args.n_colors
-            # define tail module
-            m_tail = [
-                Upsampler(conv, scale, n_feats, act=False),
-                conv(n_feats, args.n_colors, kernel_size)
-            ]
-            self.tail = nn.Sequential(*m_tail)
+          self.out_dim = args.n_colors
+          self.tail = nn.Sequential(
+            Upsampler(conv, scale, n_feats, act=False),
+            conv(n_feats, args.n_colors, kernel_size),
+          )
 
     def forward(self, x):
-        #x = self.sub_mean(x)
         x = self.head(x)
-
-        res = self.body(x)
-        res += x
-
-        if self.args.no_upsampling:
-            x = res
-        else:
-            x = self.tail(res)
-        #x = self.add_mean(x)
-        return x
+        res = self.body(x).add_(x)
+        return res if self.args.no_upsampling else self.tail(res)
 
     def load_state_dict(self, state_dict, strict=True):
         own_state = self.state_dict()
@@ -166,32 +140,44 @@ class EDSR(nn.Module):
 
 
 @register('edsr-baseline')
-def make_edsr_baseline(n_resblocks=16, n_feats=64, res_scale=1,
-                       scale=2, no_upsampling=False, rgb_range=1):
-    args = Namespace()
-    args.n_resblocks = n_resblocks
-    args.n_feats = n_feats
-    args.res_scale = res_scale
+def make_edsr_baseline(
+  n_resblocks=16,
+  n_feats=64,
+  res_scale=1,
+  scale=2,
+  no_upsampling=False,
+  rgb_range=1
+):
+  args = Namespace()
+  args.n_resblocks = n_resblocks
+  args.n_feats = n_feats
+  args.res_scale = res_scale
 
-    args.scale = [scale]
-    args.no_upsampling = no_upsampling
+  args.scale = [scale]
+  args.no_upsampling = no_upsampling
 
-    args.rgb_range = rgb_range
-    args.n_colors = 3
-    return EDSR(args)
+  args.rgb_range = rgb_range
+  args.n_colors = 3
+  return EDSR(args)
 
 
 @register('edsr')
-def make_edsr(n_resblocks=32, n_feats=256, res_scale=0.1,
-              scale=2, no_upsampling=False, rgb_range=1):
-    args = Namespace()
-    args.n_resblocks = n_resblocks
-    args.n_feats = n_feats
-    args.res_scale = res_scale
+def make_edsr(
+  n_resblocks=32,
+  n_feats=256,
+  res_scale=0.1,
+  scale=2,
+  no_upsampling=False,
+  rgb_range=1
+):
+  args = Namespace()
+  args.n_resblocks = n_resblocks
+  args.n_feats = n_feats
+  args.res_scale = res_scale
 
-    args.scale = [scale]
-    args.no_upsampling = no_upsampling
+  args.scale = [scale]
+  args.no_upsampling = no_upsampling
 
-    args.rgb_range = rgb_range
-    args.n_colors = 3
-    return EDSR(args)
+  args.rgb_range = rgb_range
+  args.n_colors = 3
+  return EDSR(args)
