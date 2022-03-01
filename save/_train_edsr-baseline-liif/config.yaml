@@ -50,9 +50,10 @@ model:
       args:
         out: 3
         hidden_list:
-        - 128
-        - 128
-        - 128
+        - 256
+        - 256
+        - 256
+        - 256
 optimizer:
   name: adam
   args:

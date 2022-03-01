@@ -47,7 +47,7 @@ def make_data_loader(spec, tag=''):
     dataset, batch_size=spec['batch_size'],
     shuffle=(tag == 'train'),
     num_workers=1,
-    pin_memory=True
+    pin_memory=True,
   )
   return loader
 
@@ -72,6 +72,7 @@ def prepare_training():
 
 def train(train_loader, model, optimizer):
   model.train()
+  # TODO does the loss here matter?
   loss_fn = nn.MSELoss()
   train_loss = utils.MovingAverager()
 
