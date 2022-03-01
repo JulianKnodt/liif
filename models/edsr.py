@@ -47,8 +47,7 @@ class ResBlock(nn.Module):
 
     self.body = nn.Sequential(*m)
     self.res_scale = res_scale
-
-    def forward(self, x): return x.add(self.body(x), alpha=self.res_scale)
+  def forward(self, x): return x.add(self.body(x), alpha=self.res_scale)
 
 class Upsampler(nn.Sequential):
   def __init__(self, conv, scale, n_feats, bn=False, act=False, bias=True):
@@ -108,12 +107,12 @@ class EDSR(nn.Module):
 
         if args.no_upsampling: self.out_dim = n_feats
         else:
+          assert(False)
           self.out_dim = args.n_colors
           self.tail = nn.Sequential(
             Upsampler(conv, scale, n_feats, act=False),
             conv(n_feats, args.n_colors, kernel_size),
           )
-
     def forward(self, x):
         x = self.head(x)
         res = self.body(x).add_(x)

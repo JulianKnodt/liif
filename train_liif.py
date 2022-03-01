@@ -135,7 +135,7 @@ def main(config_, save_path):
             lr_scheduler.step()
 
         log_info.append('train: loss={:.4f}'.format(train_loss))
-        model_ = model.module if n_gpus > 1 else model_
+        model_ = model_.module if n_gpus > 1 else model
         model_spec = config['model']
         model_spec['sd'] = model_.state_dict()
         optimizer_spec = config['optimizer']
