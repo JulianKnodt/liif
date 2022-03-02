@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import math
 
 from models import register
 
@@ -21,8 +22,8 @@ class MLP(nn.Module):
     in_size=292,
     out=3,
     skip=3,
-    activation=nn.LeakyReLU(inplace=True),
-    init=None,
+    activation=torch.sin,#nn.LeakyReLU(inplace=True),
+    init="siren",
   ):
     assert init in mlp_init_kinds, "Must use init kind"
     super(MLP, self).__init__()

@@ -46,11 +46,11 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None, ve
 
     if eval_type is None: metric_fn = utils.calc_psnr
     elif eval_type.startswith('div2k'):
-        scale = int(eval_type.split('-')[1])
-        metric_fn = partial(utils.calc_psnr, dataset='div2k', scale=scale)
+      scale = int(eval_type.split('-')[1])
+      metric_fn = partial(utils.calc_psnr, dataset='div2k', scale=scale)
     elif eval_type.startswith('benchmark'):
-        scale = int(eval_type.split('-')[1])
-        metric_fn = partial(utils.calc_psnr, dataset='benchmark', scale=scale)
+      scale = int(eval_type.split('-')[1])
+      metric_fn = partial(utils.calc_psnr, dataset='benchmark', scale=scale)
     else: raise NotImplementedError
 
     val_res = utils.Averager()
@@ -74,8 +74,8 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None, ve
         ih, iw = batch['inp'].shape[-2:]
         s = math.sqrt(batch['coord'].shape[1] / (ih * iw))
         shape = [batch['inp'].shape[0], round(ih * s), round(iw * s), 3]
-        pred = pred.view(*shape).permute(0, 3, 1, 2).contiguous()
-        batch['gt'] = batch['gt'].view(*shape).permute(0, 3, 1, 2).contiguous()
+        pred = pred.reshape(*shape).permute(0, 3, 1, 2)
+        batch['gt'] = batch['gt'].reshape(*shape).permute(0, 3, 1, 2)
 
       res = metric_fn(pred, batch['gt'])
       val_res.add(res.item(), inp.shape[0])

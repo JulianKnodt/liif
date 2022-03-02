@@ -53,7 +53,6 @@ model:
         - 256
         - 256
         - 256
-        - 256
 optimizer:
   name: adam
   args:

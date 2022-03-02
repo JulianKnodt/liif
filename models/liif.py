@@ -29,7 +29,6 @@ class LIIF(nn.Module):
     def gen_feat(self, inp):
       self.feat = self.encoder(inp)
       return self.feat
-
     def query_rgb(self, coord, cell=None):
       feat = self.feat
 
@@ -55,7 +54,8 @@ class LIIF(nn.Module):
 
       if self.cell_decode:
         rel_cell = cell.clone()
-        rel_cell[..., :] *= hw
+        rel_cell[..., 0] *= feat.shape[-2]
+        rel_cell[..., 1] *= feat.shape[-1]
 
       preds = []
       areas = []
@@ -69,17 +69,18 @@ class LIIF(nn.Module):
           qs = F.grid_sample(
             torch.cat([feat, feat_coord], dim=1),
             sample_coord,
-            mode='nearest',
-            padding_mode="reflection",
+            mode='bilinear',
             align_corners=False,
           )[:, :, 0, :].permute(0, 2, 1)
           q_feat, q_coord = qs[..., :-2], qs[..., -2:]
           rel_coord = coord - q_coord
-          rel_coord[..., :] *= hw
+          rel_coord[..., 0] *= feat.shape[-2]
+          rel_coord[..., 1] *= feat.shape[-1]
           inp = torch.cat([q_feat, rel_coord], dim=-1)
 
           if self.cell_decode: inp = torch.cat([inp, rel_cell], dim=-1)
 
+          # TODO there could be an activation function here.
           preds.append(self.imnet(inp))
           areas.append(torch.abs(rel_coord.prod(dim=-1, keepdim=True)) + 1e-9)
 
@@ -139,11 +140,8 @@ class LIIF(nn.Module):
       tot_area = areas.sum(dim=0, keepdim=True)
       areas = areas/tot_area
       # Why does this exist?
-      if self.local_ensemble:
-        areas[[0,3]] = areas[[3,0]]
-        areas[[1,2]] = areas[[2,1]]
+      if self.local_ensemble: areas[[0,1,2,3]] = areas[[3,2,1,0]]
       return (pred * areas).sum(dim=0)
-
     def query_rgb_bezier(self, coord, cell):
       ...
     def forward(self, inp, coord, cell):

@@ -57,16 +57,14 @@ def prepare_training():
     model = models.make(sv_file['model'], load_sd=True).cuda()
     optimizer = utils.make_optimizer(model.parameters(), sv_file['optimizer'], load_sd=True)
     epoch_start = sv_file['epoch'] + 1
-
-    if config.get('multi_step_lr') is None: lr_scheduler = None
-    else: lr_scheduler = MultiStepLR(optimizer, **config['multi_step_lr'])
-    for _ in range(epoch_start - 1): lr_scheduler.step()
   else:
     model = models.make(config['model']).cuda()
     optimizer = utils.make_optimizer(model.parameters(), config['optimizer'])
     epoch_start = 1
-    if config.get('multi_step_lr') is None: lr_scheduler = None
-    else: lr_scheduler = MultiStepLR(optimizer, **config['multi_step_lr'])
+
+  if config.get('multi_step_lr') is None: lr_scheduler = None
+  else: lr_scheduler = MultiStepLR(optimizer, **config['multi_step_lr'])
+  for _ in range(epoch_start - 1): lr_scheduler.step()
   return model, optimizer, epoch_start, lr_scheduler
 
 
@@ -101,7 +99,6 @@ def train(train_loader, model, optimizer):
     optimizer.step()
 
     progress.set_postfix(L=train_loss.item())
-
   return train_loss.item()
 
 
@@ -131,45 +128,44 @@ def main(config_, save_path):
     timer = utils.Timer()
 
     for epoch in range(epoch_start, epoch_max + 1):
-        t_epoch_start = timer.t()
-        log_info = ['epoch {}/{}'.format(epoch, epoch_max)]
+      t_epoch_start = timer.t()
+      log_info = ['epoch {}/{}'.format(epoch, epoch_max)]
 
-        train_loss = train(train_loader, model, optimizer)
-        if lr_scheduler is not None:
-            lr_scheduler.step()
+      train_loss = train(train_loader, model, optimizer)
+      if lr_scheduler is not None: lr_scheduler.step()
 
-        log_info.append('train: loss={:.4f}'.format(train_loss))
-        model_ = model_.module if n_gpus > 1 else model
-        model_spec = config['model']
-        model_spec['sd'] = model_.state_dict()
-        optimizer_spec = config['optimizer']
-        optimizer_spec['sd'] = optimizer.state_dict()
-        sv_file = {
-          'model': model_spec,
-          'optimizer': optimizer_spec,
-          'epoch': epoch
-        }
+      log_info.append('train: loss={:.4f}'.format(train_loss))
+      model_ = model_.module if n_gpus > 1 else model
+      model_spec = config['model']
+      model_spec['sd'] = model_.state_dict()
+      optimizer_spec = config['optimizer']
+      optimizer_spec['sd'] = optimizer.state_dict()
+      sv_file = {
+        'model': model_spec,
+        'optimizer': optimizer_spec,
+        'epoch': epoch
+      }
 
-        torch.save(sv_file, os.path.join(save_path, 'epoch-last.pth'))
+      torch.save(sv_file, os.path.join(save_path, 'epoch-last.pth'))
 
-        if (epoch_save is not None) and (epoch % epoch_save == 0):
-            torch.save(sv_file, os.path.join(save_path, f'epoch-{epoch}.pth'))
+      if (epoch_save is not None) and (epoch % epoch_save == 0):
+        torch.save(sv_file, os.path.join(save_path, f'epoch-{epoch}.pth'))
 
-        if (epoch_val is not None) and (epoch % epoch_val == 0):
-            model_ = model
-            if n_gpus > 1 and (config.get('eval_bsize') is not None): model_ = model.module
-            val_res = eval_psnr(
-              val_loader,
-              model_,
-              data_norm=config['data_norm'],
-              eval_type=config.get('eval_type'),
-              eval_bsize=config.get('eval_bsize')
-            )
+      if (epoch_val is not None) and (epoch % epoch_val == 0):
+        model_ = model
+        if n_gpus > 1 and (config.get('eval_bsize') is not None): model_ = model.module
+        val_res = eval_psnr(
+          val_loader,
+          model_,
+          data_norm=config['data_norm'],
+          eval_type=config.get('eval_type'),
+          eval_bsize=config.get('eval_bsize')
+        )
 
-            log_info.append(f'val: psnr={val_res:.4f}')
-            if val_res > max_val_v:
-              max_val_v = val_res
-              torch.save(sv_file, os.path.join(save_path, 'epoch-best.pth'))
+        log_info.append(f'val: psnr={val_res:.4f}')
+        if val_res > max_val_v:
+          max_val_v = val_res
+          torch.save(sv_file, os.path.join(save_path, 'epoch-best.pth'))
 
         t = timer.t()
         prog = (epoch - epoch_start + 1) / (epoch_max - epoch_start + 1)

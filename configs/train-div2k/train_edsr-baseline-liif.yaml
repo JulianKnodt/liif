@@ -45,7 +45,7 @@ model:
       name: mlp
       args:
         out: 3
-        hidden_list: [256,256,256,256]
+        hidden_list: [256,256,256]
 
 optimizer:
   name: adam
@@ -58,3 +58,4 @@ multi_step_lr:
 
 epoch_val: 1
 epoch_save: 100
+#resume: /home/kadmin/projects/liif/save/_train_edsr-baseline-liif/epoch-last.pth
