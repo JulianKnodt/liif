@@ -22,8 +22,8 @@ class MLP(nn.Module):
     in_size=292,
     out=3,
     skip=3,
-    activation=torch.sin,#nn.LeakyReLU(inplace=True),
-    init="siren",
+    activation=nn.LeakyReLU(inplace=True),
+    init="xavier",
   ):
     assert init in mlp_init_kinds, "Must use init kind"
     super(MLP, self).__init__()
