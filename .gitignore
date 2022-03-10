@@ -1,5 +1,6 @@
 __pycache__
 folders
 load
+save
 *.swp
 *.pth
