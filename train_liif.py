@@ -27,6 +27,7 @@ import os
 import yaml
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from tqdm import trange, tqdm
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
@@ -104,7 +105,7 @@ def train(train_loader, model, optimizer):
     loss.backward()
     optimizer.step()
 
-    progress.set_postfix(L=train_loss.item())
+    progress.set_postfix(L=train_loss.item(), mse=F.mse_loss(pred,gt).item())
   return train_loss.item()
 
 

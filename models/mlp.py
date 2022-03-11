@@ -85,6 +85,8 @@ class MLP(nn.Module):
       for t in biases: nn.init.zeros_(t)
     self.activation = activation
 
+  def variance(self, shape=None):
+    return torch.stack([l.var(shape) for l in self.layers], dim=0)
   def forward(self, p):
     batches = p.shape[:-1]
     init = p.reshape(-1, p.shape[-1])
