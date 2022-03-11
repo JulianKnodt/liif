@@ -12,6 +12,24 @@ mlp_init_kinds = {
     "xavier",
 }
 
+# https://arxiv.org/pdf/1903.09410.pdf
+# Trying to parse hard to understand stuff.
+class MonteCarloBNLinear(nn.Module):
+  def __init__(self, in_features, out_features, bias=True, monte_carlo_samples:int=8):
+    self.linear = nn.Linear(in_features, out_features,bias=bias);
+    self.mc_samples = monte_carlo_samples
+  def forward(self, x):
+    x = x.expand(self.mc_samples, *x.shape)
+    out = self.layers(x.reshape(-1, *x.shape[1:]))
+    # training=True only checks that some parameters are correct but doesn't modify output
+    out = F.batch_norm(out, torch.randn_like(out), torch.randn_like(out), training=True)
+    out = out.reshape(self.mc_samples, *x.shape)
+    self._var = out.stddev(dim=0)
+    return out.mean(dim=0)
+  def var(shape=None):
+    if shape is None: return self.var
+    return self.var.reshape_as(shape)
+
 
 @register("mlp")
 class MLP(nn.Module):
@@ -24,6 +42,8 @@ class MLP(nn.Module):
     skip=3,
     activation=nn.LeakyReLU(inplace=True),
     init="xavier",
+
+    linear=MonteCarloBNLinear,#nn.Linear,
   ):
     assert init in mlp_init_kinds, "Must use init kind"
     super(MLP, self).__init__()
@@ -77,21 +97,3 @@ class MLP(nn.Module):
     out_size = self.out.out_features
     return self.out(self.activation(x)).reshape(batches + (out_size,))
 
-# https://arxiv.org/pdf/1903.09410.pdf
-# Trying to parse hard to understand stuff.
-class MonteCarloBNLinear(nn.Module):
-  def __init__(self, in_features, out_features, bias=True, monte_carlo_samples:int=30):
-    self.linear = nn.Linear(in_features, out_features,bias=bias);
-    self.mc_samples = monte_carlo_samples
-  def forward(self, x):
-    if not self.training: return self.linear(x)
-    x = x.expand(self.mc_samples, *x.shape)
-    out = self.layers(x.reshape(-1, *x.shape[1:]))
-    # training=True only checks that some parameters are correct but doesn't modify output
-    out = F.batch_norm(out, torch.randn_like(out), torch.randn_like(out), training=True)
-    out = out.reshape(self.mc_samples, *x.shape)
-    self._var = out.stddev(dim=0)
-    return out.mean(dim=0)
-  def var(shape=None):
-    if shape is None: return self.var
-    return self.var.reshape_as(shape)

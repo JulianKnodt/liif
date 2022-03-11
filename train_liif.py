@@ -53,11 +53,13 @@ def make_data_loader(spec, tag=''):
 
 def prepare_training():
   if config.get('resume') is not None:
+    print("[note]: resuming training")
     sv_file = torch.load(config['resume'])
     model = models.make(sv_file['model'], load_sd=True).cuda()
     optimizer = utils.make_optimizer(model.parameters(), sv_file['optimizer'], load_sd=True)
     epoch_start = sv_file['epoch'] + 1
   else:
+    print("[note]: training starting fresh")
     model = models.make(config['model']).cuda()
     optimizer = utils.make_optimizer(model.parameters(), config['optimizer'])
     epoch_start = 1
@@ -67,11 +69,15 @@ def prepare_training():
   for _ in range(epoch_start - 1): lr_scheduler.step()
   return model, optimizer, epoch_start, lr_scheduler
 
+# Computes the difference of the fft of two images
+def fft_loss(x, ref):
+  got = torch.fft.rfft2(x, dim=(-3, -2), norm="ortho")
+  exp = torch.fft.rfft2(ref, dim=(-3, -2), norm="ortho")
+  return (got - exp).abs().mean()
 
 def train(train_loader, model, optimizer):
   model.train()
-  # TODO does the loss here matter?
-  loss_fn = nn.MSELoss()
+  loss_fn = fft_loss#nn.MSELoss()
   train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']
