@@ -82,6 +82,7 @@ class LIIF(nn.Module):
 
           # TODO there could be an activation function here.
           preds.append(self.imnet(inp))
+          #self.imnet.variance(preds[-1].shape[:-1] + (-1,)).sum(dim=-1,keepdim=True).mean(dim=0)
           areas.append(torch.abs(rel_coord.prod(dim=-1, keepdim=True)) + 1e-9)
 
       areas = torch.stack(areas, dim=0)

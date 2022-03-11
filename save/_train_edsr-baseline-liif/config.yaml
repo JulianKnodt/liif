@@ -3,15 +3,15 @@ train_dataset:
     name: image-folder
     args:
       root_path: ./load/div2k/DIV2K_train_HR
-      repeat: 20
+      repeat: 10
   wrapper:
     name: sr-implicit-downsampled
     args:
       inp_size: 48
       scale_max: 4
       augment: true
-      sample_q: 2304
-  batch_size: 16
+      sample_q: 1100
+  batch_size: 12
 val_dataset:
   dataset:
     name: image-folder
@@ -50,9 +50,9 @@ model:
       args:
         out: 3
         hidden_list:
-        - 256
-        - 256
-        - 256
+        - 128
+        - 128
+        - 128
 optimizer:
   name: adam
   args:

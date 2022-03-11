@@ -6,6 +6,7 @@ from functools import partial
 import yaml
 import torch
 from torch.utils.data import DataLoader
+import torchvision as tv
 from tqdm import tqdm
 
 import datasets
@@ -28,7 +29,15 @@ def batched_predict(model, inp, coord, cell, bsize):
     return pred
 
 
-def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None, verbose=False):
+def eval_psnr(
+  loader,
+  model,
+  data_norm=None,
+  eval_type=None,
+  eval_bsize=None,
+  verbose=False,
+  save_image=True,
+):
     model.eval()
 
     if data_norm is None:
@@ -56,7 +65,7 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None, ve
     val_res = utils.Averager()
 
     progress = tqdm(loader, leave=False, desc='val')
-    for batch in progress:
+    for i, batch in enumerate(progress):
       for k, v in batch.items():
         batch[k] = v.cuda()
 
@@ -69,17 +78,21 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None, ve
       pred = pred * gt_div + gt_sub
       pred.clamp_(min=0, max=1)
 
+      gt = batch['gt']
       # reshape for shaving-eval
       if eval_type is not None:
         ih, iw = batch['inp'].shape[-2:]
         s = math.sqrt(batch['coord'].shape[1] / (ih * iw))
         shape = [batch['inp'].shape[0], round(ih * s), round(iw * s), 3]
         pred = pred.reshape(*shape).permute(0, 3, 1, 2)
-        batch['gt'] = batch['gt'].reshape(*shape).permute(0, 3, 1, 2)
+        gt = gt.reshape(*shape).permute(0, 3, 1, 2)
 
-      res = metric_fn(pred, batch['gt'])
+      res = metric_fn(pred, gt)
       val_res.add(res.item(), inp.shape[0])
 
+      if save_image:
+        error = gt-pred
+        tv.utils.save_image(torch.cat([gt, pred, error.abs().sqrt()], dim=0), f"outputs/test_{i:03}.png")
       progress.set_postfix(PSNR=f"{val_res.item():.4f}")
     return val_res.item()
 

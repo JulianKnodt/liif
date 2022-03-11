@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 import torch
 import math
 
@@ -15,20 +16,25 @@ mlp_init_kinds = {
 # https://arxiv.org/pdf/1903.09410.pdf
 # Trying to parse hard to understand stuff.
 class MonteCarloBNLinear(nn.Module):
-  def __init__(self, in_features, out_features, bias=True, monte_carlo_samples:int=8):
+  def __init__(self, in_features, out_features, bias=True, monte_carlo_samples:int=5):
+    super().__init__()
     self.linear = nn.Linear(in_features, out_features,bias=bias);
     self.mc_samples = monte_carlo_samples
+
+  @property
+  def weight(self): return self.linear.weight
+  @property
+  def bias(self): return self.linear.bias
   def forward(self, x):
     x = x.expand(self.mc_samples, *x.shape)
-    out = self.layers(x.reshape(-1, *x.shape[1:]))
+    out = self.linear(x.reshape(-1, *x.shape[1:]))
     # training=True only checks that some parameters are correct but doesn't modify output
-    out = F.batch_norm(out, torch.randn_like(out), torch.randn_like(out), training=True)
-    out = out.reshape(self.mc_samples, *x.shape)
-    self._var = out.stddev(dim=0)
+    out = F.batch_norm(out, torch.randn_like(out[0, :, 0]), torch.randn_like(out[0,:,0]), training=True)
+    self._var = out.std(dim=0)
     return out.mean(dim=0)
-  def var(shape=None):
-    if shape is None: return self.var
-    return self.var.reshape_as(shape)
+  def var(self, shape=None):
+    if shape is None: return self._var
+    return self._var.reshape(shape)
 
 
 @register("mlp")
@@ -55,7 +61,7 @@ class MLP(nn.Module):
     skip_size = hidden_size + in_size
 
     hidden_layers = [
-        nn.Linear(
+        linear(
             skip_size if (i % skip) == 0 and i != num_layers - 1 else hidden_size, hidden_size,
         )
         for i in range(num_layers)
