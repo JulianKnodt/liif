@@ -31,6 +31,7 @@ import torch.nn.functional as F
 from tqdm import trange, tqdm
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
+import random
 
 import datasets
 import models
@@ -94,8 +95,9 @@ def train(train_loader, model, optimizer):
     for k, v in batch.items(): batch[k] = v.cuda()
 
     inp = (batch['inp'] - inp_sub) / inp_div
-    feat = model.gen_feat(inp)
+    model.gen_feat(inp)
     # TODO add a step which stochastically removes the last components of the embedding.
+    model.feat[...,:random.randint(1, model.feat.shape[-1])] = 0
     pred = model.query_rgb(batch['coord'], batch['cell'])
 
     gt = (batch['gt'] - gt_sub) / gt_div
