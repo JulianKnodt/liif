@@ -94,7 +94,9 @@ def train(train_loader, model, optimizer):
     for k, v in batch.items(): batch[k] = v.cuda()
 
     inp = (batch['inp'] - inp_sub) / inp_div
-    pred = model(inp, batch['coord'], batch['cell'])
+    feat = model.gen_feat(inp)
+    # TODO add a step which stochastically removes the last components of the embedding.
+    pred = model.query_rgb(batch['coord'], batch['cell'])
 
     gt = (batch['gt'] - gt_sub) / gt_div
     loss = loss_fn(pred, gt)

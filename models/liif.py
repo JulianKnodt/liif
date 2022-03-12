@@ -6,6 +6,7 @@ import models
 from models import register
 from utils import make_coord
 
+def fat_tanh(v, eps=1e-2): return v.tanh() * (1 + eps)
 
 @register('liif')
 class LIIF(nn.Module):
@@ -29,6 +30,7 @@ class LIIF(nn.Module):
     def gen_feat(self, inp):
       self.feat = self.encoder(inp)
       return self.feat
+
     def query_rgb(self, coord, cell):
       feat = self.feat
 
@@ -51,9 +53,9 @@ class LIIF(nn.Module):
         rel_cell[:, :, 0] *= feat.shape[-2]
         rel_cell[:, :, 1] *= feat.shape[-1]
 
-      ensemble_coords = coord[None] + (offsets * rad[None])[:, None, None, :] + 1e-6
+      ensemble_coords = coord[None] + (offsets * rad[None])[:, None, None, :] + 1e-8
 
-      ensemble_coords = ensemble_coords.clamp_(min=-1+1e-6, max=1-1e-6)
+      ensemble_coords = ensemble_coords.clamp_(min=-1+1e-10, max=1-1e-10)
       sample_coords = ensemble_coords.permute(1,0,2,3).flip(-1)
       q_feat = F.grid_sample(
         torch.cat([feat, feat_coord], dim=1),
@@ -68,16 +70,15 @@ class LIIF(nn.Module):
       rel_coord[..., 0] *= feat.shape[-2]
       rel_coord[..., 1] *= feat.shape[-1]
       inp = torch.cat([q_feat, rel_coord], dim=-1)
-
       if self.cell_decode: inp = torch.cat([inp, rel_cell[None].expand_as(rel_coord)], dim=-1)
 
-      pred = self.imnet(inp)
-      areas = torch.abs(rel_coord.prod(dim=-1, keepdim=True)) + 1e-9
-
+      areas = rel_coord.prod(dim=-1, keepdim=True).abs() + 1e-9
       areas = areas/areas.sum(dim=0, keepdim=True)
       # Why does this exist?
       if self.local_ensemble: areas[[0,1,2,3]] = areas[[3,2,1,0]]
-      return (pred * areas).sum(dim=0)
+
+
+      return fat_tanh(self.imnet(inp)).mul(areas).sum(dim=0)
     def forward(self, inp, coord, cell):
       self.gen_feat(inp)
       return self.query_rgb(coord, cell)
