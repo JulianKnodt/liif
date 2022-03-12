@@ -10,7 +10,7 @@ train_dataset:
       inp_size: 48
       scale_max: 4
       augment: true
-      sample_q: 800
+      sample_q: 500
   batch_size: 12
 val_dataset:
   dataset:

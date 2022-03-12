@@ -93,20 +93,23 @@ def train(train_loader, model, optimizer):
   progress = tqdm(train_loader, leave=False, desc='train')
   for batch in progress:
     for k, v in batch.items(): batch[k] = v.cuda()
-
-    inp = (batch['inp'] - inp_sub) / inp_div
-    model.gen_feat(inp)
-    # TODO add a step which stochastically removes the last components of the embedding.
-    model.feat[...,:random.randint(1, model.feat.shape[-1])] = 0
-    pred = model.query_rgb(batch['coord'], batch['cell'])
-
+    optimizer.zero_grad()
     gt = (batch['gt'] - gt_sub) / gt_div
-    loss = loss_fn(pred, gt)
+    inp = (batch['inp'] - inp_sub) / inp_div
 
+    model.gen_feat(inp)
+
+    pred = model.query_rgb(batch['coord'], batch['cell'])
+    loss = loss_fn(pred, gt)/2
+    loss.backward(retain_graph=True)
     train_loss.add(loss.item())
 
-    optimizer.zero_grad()
+    model.feat[:, :random.randint(1, model.feat.shape[1]//3)*3] = 0
+
+    pred = model.query_rgb(batch['coord'], batch['cell'])
+    loss = loss_fn(pred, gt)/2
     loss.backward()
+
     optimizer.step()
 
     progress.set_postfix(L=train_loss.item(), mse=F.mse_loss(pred,gt).item())
