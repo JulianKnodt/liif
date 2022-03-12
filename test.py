@@ -91,8 +91,10 @@ def eval_psnr(
       val_res.add(res.item(), inp.shape[0])
 
       if save_image:
-        error = gt-pred
-        tv.utils.save_image(torch.cat([gt, pred, error.abs().sqrt()], dim=0), f"outputs/test_{i:03}.png")
+        error = (gt-pred)
+        try:
+          tv.utils.save_image(torch.cat([gt, pred, error.abs().sqrt()], dim=0).float(), f"outputs/test_{i:03}.png")
+        except Exception as e: print(f"Failed to save image {e}")
       progress.set_postfix(PSNR=f"{val_res.item():.4f}")
     return val_res.item()
 

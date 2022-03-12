@@ -10,7 +10,7 @@ train_dataset:
       inp_size: 48
       scale_max: 4
       augment: true
-      sample_q: 1100
+      sample_q: 500
   batch_size: 12
 val_dataset:
   dataset:
@@ -68,3 +68,4 @@ multi_step_lr:
   gamma: 0.5
 epoch_val: 1
 epoch_save: 100
+resume: /home/kadmin/projects/super_res_streaming/liif/save/_train_edsr-baseline-liif/epoch-last.pth
