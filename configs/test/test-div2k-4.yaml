@@ -9,7 +9,7 @@ test_dataset:
     args: {}
   batch_size: 1
 eval_type: div2k-4
-eval_bsize: 30000
+eval_bsize: 10000
 
 data_norm:
   inp: {sub: [0.5], div: [0.5]}

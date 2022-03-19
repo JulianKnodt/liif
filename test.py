@@ -8,7 +8,6 @@ import torch
 from torch.utils.data import DataLoader
 import torchvision as tv
 from tqdm import tqdm
-
 import datasets
 import models
 import utils
@@ -16,13 +15,13 @@ import utils
 
 def batched_predict(model, inp, coord, cell, bsize):
     with torch.no_grad():
-      model.gen_feat(inp)
+      feat = model.gen_feat(inp)
       n = coord.shape[1]
       ql = 0
       preds = []
       while ql < n:
         qr = min(ql + bsize, n)
-        pred = model.query_rgb(coord[:, ql: qr, :], cell[:, ql: qr, :])
+        pred = model.query_rgb(feat, coord[:, ql:qr, :], cell[:, ql:qr, :])
         preds.append(pred)
         ql = qr
       pred = torch.cat(preds, dim=1)
@@ -38,7 +37,7 @@ def eval_psnr(
   verbose=False,
   save_image=True,
 ):
-    model.eval()
+    model = model.eval()
 
     if data_norm is None:
       data_norm = {
@@ -93,8 +92,13 @@ def eval_psnr(
       if save_image:
         error = (gt-pred)
         try:
-          tv.utils.save_image(torch.cat([gt, pred, error.abs().sqrt()], dim=0).float(), f"outputs/test_{i:03}.png")
-        except Exception as e: print(f"Failed to save image {e}")
+          tv.utils.save_image(torch.cat([
+            gt,
+            pred,
+            error.abs().sqrt(),
+          ], dim=0).float(), f"outputs/test_{i:03}.png")
+        except Exception as e:
+          print(f"Failed to save image with shape {pred.shape} for gt shape {gt.shape}: {e}")
       progress.set_postfix(PSNR=f"{val_res.item():.4f}")
     return val_res.item()
 

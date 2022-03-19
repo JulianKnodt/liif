@@ -77,9 +77,9 @@ def fft_loss(x, ref):
   exp = torch.fft.rfft2(ref, dim=(-3, -2), norm="ortho")
   return (got - exp).abs().mean()
 
-def train(train_loader, model, optimizer):
+def train(train_loader, model, opt):
   model.train()
-  loss_fn = fft_loss#nn.MSELoss()
+  loss_fn = lambda x, ref: (fft_loss(x, ref) + F.l1_loss(x, ref))/2 #nn.MSELoss()
   train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']
@@ -91,28 +91,40 @@ def train(train_loader, model, optimizer):
   gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
 
   progress = tqdm(train_loader, leave=False, desc='train')
-  for batch in progress:
+  opt_step = 5
+  N = 2 * opt_step
+  for i, batch in enumerate(progress):
     for k, v in batch.items(): batch[k] = v.cuda()
-    optimizer.zero_grad()
     gt = (batch['gt'] - gt_sub) / gt_div
     inp = (batch['inp'] - inp_sub) / inp_div
 
-    model.gen_feat(inp)
+    feat = model.gen_feat(inp)
 
-    pred = model.query_rgb(batch['coord'], batch['cell'])
-    loss = loss_fn(pred, gt)/2
-    loss.backward(retain_graph=True)
+    # TODO incorporate
+    # https://openreview.net/pdf?id=WA39qkJvLi
+
+    # train full model
+    pred = model.query_rgb(feat, batch['coord'], batch['cell'])
+    loss = loss_fn(pred, gt)
+    loss.div(N).backward(retain_graph=True)
     train_loss.add(loss.item())
 
-    model.feat[:, :random.randint(1, model.feat.shape[1]//3)*3] = 0
+    total_loss = F.mse_loss(pred, gt).item()
 
-    pred = model.query_rgb(batch['coord'], batch['cell'])
-    loss = loss_fn(pred, gt)/2
-    loss.backward()
+    # train partial model (with zeroed out trailing features)
+    feat[:, :random.randint(1, feat.shape[1]//3)*3] = 0
+    pred = model.query_rgb(feat, batch['coord'], batch['cell'])
+    loss = loss_fn(pred, gt).div(N)
+    loss.backward(retain_graph=True)
 
-    optimizer.step()
+    # ---
+    if (i+1) % opt_step == 0:
+      opt.step()
+      opt.zero_grad()
 
-    progress.set_postfix(L=train_loss.item(), mse=F.mse_loss(pred,gt).item())
+    progress.set_postfix(L=train_loss.item(), mse=total_loss)
+  opt.step()
+  opt.zero_grad()
   return train_loss.item()
 
 
