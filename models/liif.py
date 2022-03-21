@@ -62,7 +62,6 @@ class LIIF(nn.Module):
       self.cell_decode = cell_decode
 
       self.encoder = models.make(encoder_spec)
-      #self.hash_enc = HashEncoder()
       # Just a standard MLP usually, altho I added skip connections for fun.
       self.imnet = models.make(imnet_spec)
 
