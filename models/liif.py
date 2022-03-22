@@ -71,7 +71,6 @@ class LIIF(nn.Module):
       if self.feat_unfold:
         f0, f1, f2, f3 = feat.shape
         feat = F.unfold(feat, 3, padding=1).reshape(f0, f1 * 9, f2, f3)
-      self.local_ensemble = False
       eps = 0
       if self.local_ensemble:
         offsets = torch.tensor([
@@ -100,6 +99,8 @@ class LIIF(nn.Module):
         sample_coords,
         mode='bilinear',
         align_corners=False,
+        # TODO original had a weird padding mode
+        padding_mode="border",
       )
       q_feat = q_feat.permute(2,0,3,1)
       q_feat, q_coord = q_feat[..., :-2], q_feat[..., -2:]

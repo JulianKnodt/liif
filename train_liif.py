@@ -81,8 +81,9 @@ def train(train_loader, model, opt):
   model.train()
   def loss_fn(x, ref):
     a = random.random()
-    return (a*fft_loss(x, ref) + (1-a) * F.l1_loss(x, ref))/2
+    return (fft_loss(x, ref) + F.l1_loss(x, ref))/2
   loss_fn = fft_loss
+  #loss_fn = F.mse_loss
   train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']
@@ -94,8 +95,8 @@ def train(train_loader, model, opt):
   gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
 
   progress = tqdm(train_loader, leave=False, desc='train')
-  opt_step = 3
-  N = 2 * opt_step
+  opt_step = 1
+  N = opt_step # * 2
   for i, batch in enumerate(progress):
     for k, v in batch.items(): batch[k] = v.cuda()
     gt = (batch['gt'] - gt_sub) / gt_div
@@ -125,8 +126,6 @@ def train(train_loader, model, opt):
       opt.zero_grad()
 
     progress.set_postfix(L=train_loss.item(), mse=total_loss)
-  opt.step()
-  opt.zero_grad()
   return train_loss.item()
 
 

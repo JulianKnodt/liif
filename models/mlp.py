@@ -26,12 +26,12 @@ class MonteCarloDropoutLinear(nn.Module):
   @property
   def bias(self): return self.linear.bias
   def forward(self, x):
-    self.monte_carlo_samples = 2
+    self.monte_carlo_samples = 4
     x = x.expand(self.mc_samples, *x.shape)
     # training=True must always be set to true since we always want to compute variance
     # We compute dropout before passing to the linear layer because of how the MLP as a whole is
     # structured.
-    x = F.dropout(x, p=1e-2, training=self.training, inplace=not self.training)
+    #x = F.dropout(x, p=1e-2, training=self.training, inplace=not self.training)
     out = self.linear(x.reshape(-1, *x.shape[1:]))
     out = F.batch_norm(out, torch.randn_like(out[0, :, 0]), torch.randn_like(out[0,:,0]), training=True)
 
