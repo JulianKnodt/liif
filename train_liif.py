@@ -79,11 +79,8 @@ def fft_loss(x, ref):
 
 def train(train_loader, model, opt):
   model.train()
-  def loss_fn(x, ref):
-    a = random.random()
-    return (fft_loss(x, ref) + F.l1_loss(x, ref))/2
+  def loss_fn(x, ref): return (fft_loss(x, ref) + F.l1_loss(x, ref))/2
   loss_fn = fft_loss
-  #loss_fn = F.mse_loss
   train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']
@@ -96,7 +93,7 @@ def train(train_loader, model, opt):
 
   progress = tqdm(train_loader, leave=False, desc='train')
   opt_step = 1
-  N = opt_step # * 2
+  N = opt_step * 2
   for i, batch in enumerate(progress):
     for k, v in batch.items(): batch[k] = v.cuda()
     gt = (batch['gt'] - gt_sub) / gt_div
@@ -116,8 +113,10 @@ def train(train_loader, model, opt):
     total_loss = F.mse_loss(pred, gt).item()
 
     # train partial model (with zeroed out trailing features)
-    feat[:, :random.randint(1, feat.shape[1]//3)*3] = 0
-    pred = model.query_rgb(feat, batch['coord'], batch['cell'])
+    new_feat = feat.clone()
+    assert(feat.shape[1] % 3 == 0)
+    new_feat[:, (random.randint(1, feat.shape[1]//3)*3):] = 0
+    pred = model.query_rgb(new_feat, batch['coord'], batch['cell'])
     loss_fn(pred, gt).div(N).backward()
 
     # ---

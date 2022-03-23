@@ -8,44 +8,6 @@ from utils import make_coord
 
 def fat_tanh(v, eps=1e-2): return v.tanh() * (1 + eps)
 
-# spatially hashes integers using some primes to get indeces along the last dimension.
-def spatial_hash(v, primes=[2654435761]):
-  result = v[..., 0]
-  for i, p in enumerate(primes): result ^= v[..., i] * p
-  return result
-
-class HashEncoder(nn.Module):
-  def __init__(
-    self,
-    input_dims:int=2,
-    table_size_base2:int=19,
-    values_per_entry:int=2,
-    levels:int = 16,
-    base_resolution:int = 16,
-  ):
-    super().__init__()
-    self.values_per_entry = values_per_entry
-    self.levels = levels
-    self.base_reso = base_resolution
-    # only have resolution scale of value 2
-
-  def get_vals(self, point, level, enc=None):
-    # point in [0,1]
-    reso = self.base_reso * (1 << level)
-    coord = (point  * (reso-1)).floor().long()
-    offsets = torch.tensor([
-      [0,0],[0,1],[1,0],[1,1],
-    ], dtype=torch.float, device=coord.device)
-    sz = self.sz if enc is None else enc.shape[1]
-    h = spatial_hash(coord) % sz
-    return enc[torch.arange(enc.shape[0]).unsqueeze(-1), h.flatten(1), :]
-  def forward(self, p, enc=None):
-    # keep batch dimension and
-    if enc is not None: enc = enc.reshape(enc.shape[0], -1, self.values_per_entry)
-    assert((p <= 1).all())
-    assert((p >= 0).all())
-    return torch.cat([self.get_vals(p, l, enc) for l in range(self.levels)], dim=-1)
-
 @register('liif')
 class LIIF(nn.Module):
     def __init__(
@@ -65,7 +27,8 @@ class LIIF(nn.Module):
       # Just a standard MLP usually, altho I added skip connections for fun.
       self.imnet = models.make(imnet_spec)
 
-    def gen_feat(self, inp): return self.encoder(inp)
+    # TODO maybe want to constrain this, so that when encoding we can quantize it better.
+    def gen_feat(self, inp): return self.encoder(inp).tanh()
 
     def query_rgb(self, feat, coord, cell):
       if self.feat_unfold:
@@ -97,10 +60,9 @@ class LIIF(nn.Module):
       q_feat = F.grid_sample(
         torch.cat([feat, feat_coord], dim=1),
         sample_coords,
-        mode='bilinear',
+        # necessary to use nearest, somehow works better than bilinear
+        mode='nearest',
         align_corners=False,
-        # TODO original had a weird padding mode
-        padding_mode="border",
       )
       q_feat = q_feat.permute(2,0,3,1)
       q_feat, q_coord = q_feat[..., :-2], q_feat[..., -2:]
