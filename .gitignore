@@ -4,3 +4,4 @@ load
 save
 *.swp
 *.pth
+encoded/
