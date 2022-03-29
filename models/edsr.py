@@ -112,6 +112,27 @@ def make_edsr_baseline(
   args.n_colors = 3
   return EDSR(args)
 
+@register('edsr-small')
+def make_edsr_baseline(
+  n_resblocks=16,
+  n_feats=30,
+  res_scale=1,
+  scale=2,
+  no_upsampling=True,
+  rgb_range=1
+):
+  args = Namespace()
+  args.n_resblocks = n_resblocks
+  args.n_feats = n_feats
+  args.res_scale = res_scale
+
+  args.scale = [scale]
+  args.no_upsampling = no_upsampling
+
+  args.rgb_range = rgb_range
+  args.n_colors = 3
+  return EDSR(args)
+
 
 @register('edsr')
 def make_edsr(

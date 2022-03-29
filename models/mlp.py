@@ -49,6 +49,7 @@ class MLP(nn.Module):
     skip=3,
     activation=nn.LeakyReLU(inplace=True),
     init="xavier",
+    bias=True,
 
     linear=MonteCarloDropoutLinear, #nn.Linear,
   ):
@@ -64,13 +65,14 @@ class MLP(nn.Module):
     hidden_layers = [
         linear(
             skip_size if (i % skip) == 0 and i != num_layers - 1 else hidden_size, hidden_size,
+            bias=bias,
         )
         for i in range(num_layers)
     ]
 
-    self.init = nn.Linear(in_size, hidden_size)
+    self.init = nn.Linear(in_size, hidden_size,bias=bias)
     self.layers = nn.ModuleList(hidden_layers)
-    self.out = nn.Linear(hidden_size, out)
+    self.out = nn.Linear(hidden_size, out, bias=bias)
     weights = [self.init.weight, self.out.weight, *[l.weight for l in self.layers]]
     biases = [self.init.bias, self.out.bias, *[l.bias for l in self.layers]]
 
