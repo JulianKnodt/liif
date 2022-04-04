@@ -6,7 +6,7 @@ import models
 from models import register
 from utils import make_coord
 
-def fat_tanh(v, eps=1e-2): return v.tanh() * (1 + eps)
+def fat_tanh(v, eps:float=1e-2): return v.tanh() * (1 + eps)
 
 @register('liif')
 class LIIF(nn.Module):
@@ -30,11 +30,12 @@ class LIIF(nn.Module):
     # TODO maybe want to constrain this, so that when encoding we can quantize it better.
     def gen_feat(self, inp): return self.encoder(inp).tanh()
 
+    @torch.jit.export
     def query_rgb(self, feat, coord, cell):
       if self.feat_unfold:
         f0, f1, f2, f3 = feat.shape
         feat = F.unfold(feat, 3, padding=1).reshape(f0, f1 * 9, f2, f3)
-      eps = 0
+      eps = 0.
       if self.local_ensemble:
         offsets = torch.tensor([
           [-1,-1],[-1, 1],[1,-1],[1,1],
@@ -44,14 +45,16 @@ class LIIF(nn.Module):
         offsets = torch.tensor([[0,0]], dtype=torch.float, device=coord.device)
       rad = torch.tensor([2/r/2 for r in feat.shape[2:]],device=coord.device,dtype=torch.float)
 
-      feat_coord = make_coord(feat.shape[-2:], flatten=False).cuda()\
+      feat_coord = make_coord(feat.shape[-2], feat.shape[-1], flatten=False)\
+        .to(feat.device)\
         .permute(2, 0, 1)[None]\
-        .expand(feat.shape[0], 2, *feat.shape[-2:])
+        .expand(feat.shape[0], 2, feat.shape[-2], feat.shape[-1])
 
-      if self.cell_decode:
-        rel_cell = cell.clone()
-        rel_cell[:, :, 0] *= feat.shape[-2]
-        rel_cell[:, :, 1] *= feat.shape[-1]
+      #if self.cell_decode:
+      assert(self.cell_decode)
+      rel_cell = cell.clone()
+      rel_cell[:, :, 0] *= feat.shape[-2]
+      rel_cell[:, :, 1] *= feat.shape[-1]
 
       ensemble_coords = coord[None] + (offsets * rad[None])[:, None, None, :] + eps
 

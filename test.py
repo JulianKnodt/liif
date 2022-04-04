@@ -27,6 +27,19 @@ def batched_predict(model, inp, coord, cell, bsize):
       pred = torch.cat(preds, dim=1)
     return pred
 
+def batched_predict_with_feat(model, feat, coord, cell, bsize):
+    with torch.no_grad():
+      n = coord.shape[1]
+      ql = 0
+      preds = []
+      while ql < n:
+        qr = min(ql + bsize, n)
+        pred = model.query_rgb(feat, coord[:, ql:qr, :], cell[:, ql:qr, :])
+        preds.append(pred)
+        ql = qr
+      pred = torch.cat(preds, dim=1)
+    return pred
+
 
 def eval_psnr(
   loader,
@@ -73,6 +86,7 @@ def eval_psnr(
         with torch.no_grad():
           pred = model(inp, batch['coord'], batch['cell'])
       else:
+        print(batch['coord'].shape, batch['cell'].shape, inp.shape)
         pred = batched_predict(model, inp, batch['coord'], batch['cell'], eval_bsize)
       pred = pred * gt_div + gt_sub
       pred.clamp_(min=0, max=1)

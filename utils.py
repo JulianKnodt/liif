@@ -90,16 +90,18 @@ def make_optimizer(param_list, optimizer_spec, load_sd=False):
     return optimizer
 
 
-def make_coord(shape, ranges=None, flatten=True, device="cuda"):
+def make_coord(h:int, w:int, flatten:bool=True):
     """ Make coordinates at grid centers.
     """
     coord_seqs = []
-    for i, n in enumerate(shape):
-        v0, v1 = (-1, 1) if ranges is None else ranges[i]
-        r = (v1 - v0) / (2 * n)
-        seq = v0 + r + (2 * r) * torch.arange(n).float()
+    for n in [h,w]:
+        #v0, v1 = (-1, 1)
+        #r = (v1 - v0) / (2 * n)
+        r = 1/n
+        #seq = v0 + r + (2 * r) * torch.arange(n).float()
+        seq = -1 + r + (2 * r) * torch.arange(n).float()
         coord_seqs.append(seq)
-    ret = torch.stack(torch.meshgrid(*coord_seqs, indexing="ij"), dim=-1)
+    ret = torch.stack(torch.meshgrid(coord_seqs[0], coord_seqs[1], indexing="ij"), dim=-1)
     if flatten: ret = ret.view(-1, ret.shape[-1])
     return ret
 
@@ -108,7 +110,7 @@ def to_pixel_samples(img):
     """ Convert the image to coord-RGB pairs.
         img: Tensor, (3, H, W)
     """
-    coord = make_coord(img.shape[-2:])
+    coord = make_coord(*img.shape[-2:])
     rgb = img.view(3, -1).permute(1, 0)
     return coord, rgb
 
