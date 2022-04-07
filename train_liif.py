@@ -80,7 +80,7 @@ def fft_loss(x, ref):
 def train(train_loader, model, opt):
   model.train()
   def loss_fn(x, ref): return (fft_loss(x, ref) + F.l1_loss(x, ref))/2
-  loss_fn = fft_loss
+  loss_fn = F.mse_loss#fft_loss
   train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']
@@ -100,9 +100,6 @@ def train(train_loader, model, opt):
     inp = (batch['inp'] - inp_sub) / inp_div
 
     feat = model.gen_feat(inp)
-
-    # TODO incorporate
-    # https://openreview.net/pdf?id=WA39qkJvLi
 
     # train full model
     pred = model.query_rgb(feat, batch['coord'], batch['cell'])

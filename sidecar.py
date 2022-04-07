@@ -1,8 +1,11 @@
+import sys
+sys.path.append("../torch-dct")
+
 import torch
 import json
 import argparse
 import torchvision as tv
-import sys
+import torch_dct as dct
 
 import models
 from utils import make_coord
@@ -16,7 +19,7 @@ def arguments():
   a.add_argument("--total-size", type=int, default=30, help="Total number of expected channels")
   return a.parse_args()
 
-def super_resolve_video(file_name, model, height=480, width=720):
+def super_resolve_video(file_name, model, height=240, width=360):
   # read entire chunk in
   # TODO need to read more than the first frame and stick them all together
   frames, _, info = tv.io.read_video(file_name)

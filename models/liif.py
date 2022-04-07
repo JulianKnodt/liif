@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import models
 from models import register
 from utils import make_coord
+import time
 
 def fat_tanh(v, eps:float=1e-2): return v.tanh() * (1 + eps)
 
@@ -58,8 +59,11 @@ class LIIF(nn.Module):
 
       ensemble_coords = coord[None] + (offsets * rad[None])[:, None, None, :] + eps
 
-      ensemble_coords = ensemble_coords.clamp_(min=-1+1e-10, max=1-1e-10)
-      sample_coords = ensemble_coords.permute(1,0,2,3).flip(-1)
+      sample_coords = ensemble_coords\
+        .clamp_(min=-1+1e-10, max=1-1e-10)\
+        .permute(1,0,2,3)\
+        .flip(-1)
+
       q_feat = F.grid_sample(
         torch.cat([feat, feat_coord], dim=1),
         sample_coords,
@@ -80,6 +84,8 @@ class LIIF(nn.Module):
       areas = areas/areas.sum(dim=0, keepdim=True)
       # Why does this exist?
       if self.local_ensemble: areas[[0,1,2,3]] = areas[[3,2,1,0]]
-      return fat_tanh(self.imnet(inp).mul(areas).sum(dim=0))
+      return fat_tanh(self.imnet(inp).mul(areas).sum(dim=0))#.reshape(*coord.shape[:-1], 3, 3, 3)
     def forward(self, inp, coord, cell):
-      return self.query_rgb(self.gen_feat(inp), coord, cell)
+      feat = self.gen_feat(inp)
+      return self.query_rgb(feat, coord, cell)
+

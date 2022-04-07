@@ -40,7 +40,6 @@ def batched_predict_with_feat(model, feat, coord, cell, bsize):
       pred = torch.cat(preds, dim=1)
     return pred
 
-
 def eval_psnr(
   loader,
   model,
@@ -50,6 +49,7 @@ def eval_psnr(
   verbose=False,
   save_image=True,
 ):
+    # TODO fix this method
     model = model.eval()
 
     if data_norm is None:
@@ -86,7 +86,6 @@ def eval_psnr(
         with torch.no_grad():
           pred = model(inp, batch['coord'], batch['cell'])
       else:
-        print(batch['coord'].shape, batch['cell'].shape, inp.shape)
         pred = batched_predict(model, inp, batch['coord'], batch['cell'], eval_bsize)
       pred = pred * gt_div + gt_sub
       pred.clamp_(min=0, max=1)
