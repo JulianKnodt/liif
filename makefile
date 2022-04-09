@@ -13,7 +13,7 @@ train-div2k-mini:
 # lower memory usage?
 test-div2k-4: clean
 	python3 test.py --config configs/test/test-div2k-4.yaml \
-    --model save/_train_edsr-liif-small/epoch-best.pth
+    --model save/_train_edsr-liif-mini/epoch-best.pth
 
 # higher memory usage?
 test-div2k-2: clean

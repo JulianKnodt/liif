@@ -45,19 +45,19 @@ model:
       name: mlp
       args:
         hidden_list: [128,128]
-        out: 147
+        out: 75
         in_size: 274
 
 optimizer:
   name: adam
   args:
     lr: 1.e-3
-    weight_decay: 1.e-6
+  weight_decay: 1.e-5
 epoch_max: 1000
 multi_step_lr:
-  milestones: [200, 400, 600, 800]
+  milestones: [25, 50, 75, 100]
   gamma: 0.5
 
 epoch_val: 1
 epoch_save: 100
-#resume: /home/kadmin/projects/super_res_streaming/liif/save/_train_edsr-liif-mini/epoch-best.pth
+resume: /home/kadmin/projects/super_res_streaming/liif/save/_train_edsr-liif-mini/epoch-best.pth

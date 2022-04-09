@@ -26,22 +26,25 @@ class MLP(nn.Module):
     init="xavier",
     bias=True,
 
+    skip=2,
+
     linear=nn.Linear, #nn.Linear,
   ):
     assert init in mlp_init_kinds, "Must use init kind"
     super(MLP, self).__init__()
     self.in_size = in_size
     num_layers = len(hidden_list)
-    hidden_size = max(hidden_list)
+
+    self.skip = skip
 
     hidden_layers = [
-      linear(hidden_size, hidden_size, bias=bias,)
-      for i in range(num_layers)
+      linear(sz + (in_size if i % skip == 0 else 0), hidden_list[i+1], bias=bias)
+      for i, sz in enumerate(hidden_list[:-1])
     ]
 
-    self.init = linear(in_size, hidden_size,bias=bias)
+    self.init = linear(in_size,hidden_list[0],bias=bias)
     self.layers = nn.ModuleList(hidden_layers)
-    self.out = linear(hidden_size, out, bias=bias)
+    self.out = linear(hidden_list[-1], out, bias=bias)
     self.activation = activation
 
     if init is None: return
@@ -70,6 +73,7 @@ class MLP(nn.Module):
 
     x = self.init(init)
     for i, layer in enumerate(self.layers):
+      if i % self.skip == 0: x = torch.cat([init, x], dim=-1)
       x = layer(self.activation(x))
     out_size = self.out.out_features
     return self.out(self.activation(x)).reshape(batches + (out_size,))

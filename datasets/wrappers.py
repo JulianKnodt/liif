@@ -12,6 +12,8 @@ import torch.nn.functional as F
 from datasets import register
 from utils import make_coord, to_pixel_samples
 
+N = 5
+def round_to(v:int,to:int): return to*(v//to)
 
 @register('sr-implicit-paired')
 class SRImplicitPaired(Dataset):
@@ -30,34 +32,35 @@ class SRImplicitPaired(Dataset):
       s = img_hr.shape[-2] // img_lr.shape[-2] # assume int scale
       if self.inp_size is None:
         h_lr, w_lr = img_lr.shape[-2:]
-        img_hr = img_hr[:, :h_lr * s, :w_lr * s]
-        crop_lr, crop_hr = img_lr, img_hr
+        crop_hr = img_hr = img_hr[:, :round_to(h_lr * s,N), :round_to(w_lr * s, N)]
+        crop_lr = img_lr
       else:
         w_lr = self.inp_size
         x0 = random.randint(0, img_lr.shape[-2] - w_lr)
         y0 = random.randint(0, img_lr.shape[-1] - w_lr)
         crop_lr = img_lr[:, x0: x0 + w_lr, y0: y0 + w_lr]
-        print(crop_lr.shape)
         w_hr = w_lr * s
         x1 = x0 * s
         y1 = y0 * s
         crop_hr = img_hr[:, x1: x1 + w_hr, y1: y1 + w_hr]
 
       if self.augment:
-          hflip = random.random() < 0.5
-          vflip = random.random() < 0.5
-          dflip = random.random() < 0.5
+        hflip = random.random() < 0.5
+        vflip = random.random() < 0.5
+        dflip = random.random() < 0.5
 
-          def augment(x):
-            if hflip: x = x.flip(-2)
-            if vflip: x = x.flip(-1)
-            if dflip: x = x.transpose(-2, -1)
-            return x
+        def augment(x):
+          if hflip: x = x.flip(-2)
+          if vflip: x = x.flip(-1)
+          if dflip: x = x.transpose(-2, -1)
+          return x
 
-          crop_lr = augment(crop_lr)
-          crop_hr = augment(crop_hr)
+        crop_lr = augment(crop_lr)
+        crop_hr = augment(crop_hr)
 
-      hr_coord, hr_rgb = to_pixel_samples(crop_hr.contiguous())
+      hr_coord = make_coord(crop_hr.shape[-2]//N,crop_hr.shape[-1]//N)
+      hr_rgb = crop_hr.flatten(1).t()
+      #hr_coord, hr_rgb = to_pixel_samples(crop_hr.contiguous())
 
       if self.sample_q is not None:
           sample_lst = np.random.choice(
@@ -73,7 +76,9 @@ class SRImplicitPaired(Dataset):
         'inp': crop_lr,
         'coord': hr_coord,
         'cell': cell,
-        'gt': hr_rgb
+        'gt': hr_rgb,
+        'height': crop_hr.shape[-2],
+        'width': crop_hr.shape[-1],
       }
 
 
@@ -98,7 +103,6 @@ class SRImplicitDownsampled(Dataset):
     def __len__(self): return len(self.dataset)
 
     def __getitem__(self, idx):
-      N = 7
       img = self.dataset[idx]
       s = random.uniform(self.scale_min, self.scale_max)
 

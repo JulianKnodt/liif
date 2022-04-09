@@ -28,7 +28,6 @@ class LIIF(nn.Module):
       # Just a standard MLP usually, altho I added skip connections for fun.
       self.imnet = models.make(imnet_spec)
 
-    # TODO maybe want to constrain this, so that when encoding we can quantize it better.
     def gen_feat(self, inp): return self.encoder(inp).tanh()
 
     @torch.jit.export
@@ -80,12 +79,10 @@ class LIIF(nn.Module):
       inp = torch.cat([q_feat, rel_coord], dim=-1)
       if self.cell_decode: inp = torch.cat([inp, rel_cell[None].expand_as(rel_coord)], dim=-1)
 
-      areas = rel_coord.prod(dim=-1, keepdim=True).abs() + 1e-9
-      areas = areas/areas.sum(dim=0, keepdim=True)
+      areas = rel_coord.prod(dim=-1, keepdim=True).abs()
+      areas = areas/areas.sum(dim=0, keepdim=True).clamp(min=1e-5)
       # Why does this exist?
       if self.local_ensemble: areas[[0,1,2,3]] = areas[[3,2,1,0]]
-      return fat_tanh(self.imnet(inp).mul(areas).sum(dim=0))#.reshape(*coord.shape[:-1], 3, 3, 3)
-    def forward(self, inp, coord, cell):
-      feat = self.gen_feat(inp)
-      return self.query_rgb(feat, coord, cell)
+      return fat_tanh(self.imnet(inp).mul(areas).sum(dim=0))
+    def forward(self, inp, coord, cell): return self.query_rgb(self.gen_feat(inp), coord, cell)
 
