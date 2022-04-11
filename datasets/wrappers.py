@@ -69,8 +69,8 @@ class SRImplicitPaired(Dataset):
           hr_rgb = hr_rgb[sample_lst]
 
       cell = torch.ones_like(hr_coord)
-      cell[:, 0] *= 2 / crop_hr.shape[-2]
-      cell[:, 1] *= 2 / crop_hr.shape[-1]
+      cell[:, 0] *= 2 / (crop_hr.shape[-2] // N)
+      cell[:, 1] *= 2 / (crop_hr.shape[-1] // N)
 
       return {
         'inp': crop_lr,
@@ -146,8 +146,8 @@ class SRImplicitDownsampled(Dataset):
         hr_rgb = hr_rgb[sample_lst]
 
       cell = torch.ones_like(hr_coord)
-      cell[:, 0] *= 2 / crop_hr.shape[-2]
-      cell[:, 1] *= 2 / crop_hr.shape[-1]
+      cell[:, 0] *= 2 / (crop_hr.shape[-2] // N)
+      cell[:, 1] *= 2 / (crop_hr.shape[-1] // N)
 
       return {
         'inp': crop_lr,

@@ -35,6 +35,7 @@ class LIIF(nn.Module):
       if self.feat_unfold:
         f0, f1, f2, f3 = feat.shape
         feat = F.unfold(feat, 3, padding=1).reshape(f0, f1 * 9, f2, f3)
+
       eps = 0.
       if self.local_ensemble:
         offsets = torch.tensor([

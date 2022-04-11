@@ -5,7 +5,6 @@ import torch
 import json
 import argparse
 import torchvision as tv
-import torch_dct as dct
 
 import models
 from utils import make_coord
@@ -15,7 +14,11 @@ def eprint(*args, **kwargs): print(*args, file=sys.stderr, **kwargs)
 
 def arguments():
   a = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  a.add_argument("--model", type=str, default="save/_train_edsr-liif-small/epoch-best.pth", help="Which model to use for super resolution")
+  a.add_argument(
+    "--model",
+    type=str,
+    default="save/_train_edsr-liif-small/epoch-best.pth", help="Which model to use for super resolution"
+  )
   a.add_argument("--total-size", type=int, default=30, help="Total number of expected channels")
   return a.parse_args()
 
