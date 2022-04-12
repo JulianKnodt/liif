@@ -52,7 +52,6 @@ optimizer:
   name: adam
   args:
     lr: 1.e-3
-  weight_decay: 1.e-5
 epoch_max: 250
 multi_step_lr:
   milestones: [25, 50, 75, 100]
@@ -60,4 +59,4 @@ multi_step_lr:
 
 epoch_val: 1
 epoch_save: 100
-resume: /home/kadmin/projects/super_res_streaming/liif/save/_train_edsr-liif-mini/epoch-100.pth
+resume: /home/kadmin/projects/super_res_streaming/liif/save/_train_edsr-liif-mini/epoch-best.pth
