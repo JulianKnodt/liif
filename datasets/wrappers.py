@@ -109,12 +109,12 @@ class SRImplicitDownsampled(Dataset):
       if self.inp_size is None:
           h_lr = math.floor(img.shape[-2] / s + 1e-9)
           w_lr = math.floor(img.shape[-1] / s + 1e-9)
-          img = img[:, :round(h_lr * s), :round(w_lr * s)] # assume round int
+          img = img[:, :round_to(round(h_lr * s), N), :round_to(round(w_lr * s), N)] # assume round int
           img_down = resize_fn(img, (h_lr, w_lr))
           crop_lr, crop_hr = img_down, img
       else:
           w_lr = self.inp_size
-          w_hr = round(w_lr * (N * s//N))
+          w_hr = round_to(round(w_lr * s), N)
           x0 = random.randint(0, img.shape[-2] - w_hr)
           y0 = random.randint(0, img.shape[-1] - w_hr)
           crop_hr = img[:, x0: x0 + w_hr, y0: y0 + w_hr]
@@ -134,10 +134,21 @@ class SRImplicitDownsampled(Dataset):
         crop_lr = augment(crop_lr)
         crop_hr = augment(crop_hr)
 
-      hr_coord = make_coord(crop_hr.shape[-2],crop_hr.shape[-1],flatten=False).movedim(-1,0)
-      hr_rgb = F.unfold(crop_hr[None], N).squeeze(0).t()
-      kernel_cutoff = kc = (N-1)//2
-      hr_coord = hr_coord[:, kc:-kc,kc:-kc].flatten(-2).t()
+      hr_coord = make_coord(crop_hr.shape[-2]//N,crop_hr.shape[-1]//N)
+      # add in a bit of noise to try to normalize it
+      hr_coord = hr_coord + torch.randn_like(hr_coord) * 1e-3
+
+      hr_rgb = crop_hr.reshape(3, crop_hr.shape[1]//N, N, crop_hr.shape[2]//N, N)\
+        .permute(0, 2, 4, 1, 3)\
+        .flatten(0, 2)\
+        .flatten(1)\
+        .t()
+
+      #hr_coord = make_coord(crop_hr.shape[-2],crop_hr.shape[-1],flatten=False).movedim(-1,0)
+      #hr_rgb = F.unfold(crop_hr[None], N).squeeze(0).t()
+      #kernel_cutoff = kc = (N-1)//2
+      #hr_coord = hr_coord[:, kc:-kc,kc:-kc].flatten(-2).t()
+
       #hr_coord, hr_rgb = to_pixel_samples(img_hr)
 
       if self.sample_q is not None:

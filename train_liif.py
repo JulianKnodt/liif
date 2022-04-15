@@ -85,6 +85,7 @@ def train(train_loader, model, opt):
     ref = reshape_to_patch(ref)
     return fft_loss(x, ref)
   #loss_fn = fft_loss
+  loss_fn = F.mse_loss
   train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']
