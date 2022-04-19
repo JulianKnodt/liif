@@ -1,5 +1,5 @@
 import torch
-import torchvision as TV
+import torchvision as tv
 import torchvision.transforms.functional as TVF
 import argparse
 import os
@@ -25,25 +25,24 @@ def arguments():
   a.add_argument(
     "--chunk-sec", type=float, default=2., help="If chunking video, number of seconds to chunk by"
   )
+  a.add_argument(
+    "--reference", action="store_true", help="Do not use latent encoding, to get a size reference",
+  )
 
   args = a.parse_args()
   assert(os.path.exists(args.hdr_video)), "Video file does not exist"
   assert(os.path.exists(args.model)), "Model does not exist"
   return args
 
-def main():
-  args = arguments()
+def reference(args):
   device = args.device
   print(f"[info]: Reading video from {args.hdr_video}")
 
   curr_start = 0
-  save_file = torch.load(args.model, map_location=device)
-  model = models.make(save_file["model"], load_sd=True).to(device).eval()
 
-  print("[info]: successfully loaded encoder")
   chunk_num = 0
   while True:
-    frames, _, info = TV.io.read_video(
+    frames, _, info = tv.io.read_video(
       args.hdr_video,
       start_pts=curr_start,
       end_pts=curr_start + args.chunk_sec,
@@ -56,32 +55,73 @@ def main():
       w = args.resize_w or frames.shape[2]
       frames = TVF.resize(frames.movedim(-1, 1), (h, w), antialias=True)
 
+    tv.io.write_video(
+      f"reference/{Path(args.hdr_video).stem}.chunk_{chunk_num:03}.mp4",
+      frames,
+      fps=info["video_fps"],
+      #video_codec="libx265",
+      video_codec="libx264",
+    )
+    print(f"Finished chunk {chunk_num}")
+    curr_start += args.chunk_sec
+    chunk_num += 1
+  return
+
+def main(args):
+  device = args.device
+  print(f"[info]: Reading video from {args.hdr_video}")
+
+  curr_start = 0
+  save_file = torch.load(args.model, map_location=device)
+  model = models.make(save_file["model"], load_sd=True).to(device).eval()
+
+  print("[info]: successfully loaded encoder")
+  chunk_num = 0
+  while True:
+    frames, _, info = tv.io.read_video(
+      args.hdr_video,
+      start_pts=curr_start,
+      end_pts=curr_start + args.chunk_sec,
+      pts_unit="sec",
+    )
+    if frames.shape[0] == 1: break
+
+    if args.resize_h is not None or args.resize_w is not None:
+      h = args.resize_h or frames.shape[1]
+      w = args.resize_w or frames.shape[2]
+      frames = TVF.resize(frames.movedim(-1, 1), (h, w))
+
     all_feats = []
     for i, f in enumerate(tqdm(frames.split(args.encode_batch_size, dim=0))):
       f = f.to(device)
       assert(f.dtype == torch.uint8)
       # renormalize frame color to -1,1
       f = (f.float()/255) * 2 - 1
-
       feats = model.gen_feat(f)
       all_feats.append(feats)
+
     all_feats = (torch.cat(all_feats, dim=0)+1)/2
     all_feats = (all_feats * 255).to(torch.uint8)
+
     for f, feat in enumerate(all_feats.split(3, dim=1)):
-      TV.io.write_video(
-        "tmp.mp4",
-        #f"encoded/{Path(args.hdr_video).stem}.chunk_{chunk_num:03}.feat_{f:03}.mp4",
-        feat.movedim(1,-1),
+      tv.io.write_video(
+        f"encoded/{Path(args.hdr_video).stem}.chunk_{chunk_num:03}.feat_{f:03}.mp4",
+        feat.movedim(1, -1),
         fps=info["video_fps"],
         #video_codec="libx265",
         video_codec="libx264",
       )
-      exit()
     print(f"Finished chunk {chunk_num}")
     curr_start += args.chunk_sec
     chunk_num += 1
   return
 
+
 if __name__ == "__main__":
+  args = arguments()
+  if args.reference:
+    reference(args)
+    exit()
+
   with torch.no_grad():
-    main()
+    main(args)

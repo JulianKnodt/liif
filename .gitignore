@@ -5,3 +5,4 @@ save
 *.swp
 *.pth
 encoded/
+reference/

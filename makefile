@@ -21,6 +21,11 @@ test-div2k-2: clean
     --model save/_train_edsr-baseline-liif/epoch-best.pth
 
 encode-sample:
-	python3 encode_video.py --model save/_train_edsr-baseline-liif/epoch-best.pth \
+	python3 video_encode.py --model save/_train_edsr-liif-mini/epoch-best.pth \
   --hdr /home/kadmin/nerf_atlas/data/video/shoichi_chris.mp4 --resize-w 480 --resize-h 270 \
+  --device cpu
+
+encode-sample-reference:
+	python3 video_encode.py --model save/_train_edsr-baseline-liif/epoch-best.pth \
+  --hdr /home/kadmin/nerf_atlas/data/video/shoichi_chris.mp4 --reference \
   --device cpu
