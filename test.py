@@ -86,7 +86,6 @@ def eval_psnr(
         with torch.no_grad():
           pred = model(inp, batch['coord'], batch['cell'])
       else:
-        print(batch['coord'].shape, batch['cell'].shape, inp.shape)
         pred = batched_predict(model, inp, batch['coord'], batch['cell'], eval_bsize)
       pred = pred * gt_div + gt_sub
       pred.clamp_(min=0, max=1)
@@ -112,35 +111,42 @@ def eval_psnr(
             error.abs().sqrt(),
           ], dim=0).float(), f"outputs/test_{i:03}.png")
         except Exception as e:
-          print(f"Failed to save image with shape {pred.shape} for gt shape {gt.shape}: {e}")
+          ...
+          #print(f"Failed to save image with shape {pred.shape} for gt shape {gt.shape}: {e}")
       progress.set_postfix(PSNR=f"{val_res.item():.4f}")
     return val_res.item()
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config', required=True)
-    parser.add_argument('--model', required=True)
-    parser.add_argument('--gpu', default='0')
-    args = parser.parse_args()
+def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--config', required=True)
+  parser.add_argument('--model', required=True)
+  parser.add_argument('--gpu', default='0')
+  args = parser.parse_args()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+  os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
-    with open(args.config, 'r') as f:
-      config = yaml.load(f, Loader=yaml.FullLoader)
+  with open(args.config, 'r') as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
 
-    spec = config['test_dataset']
-    dataset = datasets.make(spec['dataset'])
-    dataset = datasets.make(spec['wrapper'], args={'dataset': dataset})
-    loader = DataLoader(dataset, batch_size=spec['batch_size'], num_workers=1, pin_memory=True)
+  spec = config['test_dataset']
+  dataset = datasets.make(spec['dataset'])
+  dataset = datasets.make(spec['wrapper'], args={'dataset': dataset})
+  loader = DataLoader(dataset, batch_size=spec['batch_size'], num_workers=1, pin_memory=True)
 
-    model_spec = torch.load(args.model)['model']
-    model = models.make(model_spec, load_sd=True).cuda()
-    print("[note]: loaded model")
+  model_spec = torch.load(args.model)['model']
+  model = models.make(model_spec, load_sd=True).cuda()
+  print("[note]: loaded model")
 
-    res = eval_psnr(loader, model,
+  with torch.no_grad():
+    res = eval_psnr(
+      loader,
+      model,
       data_norm=config.get('data_norm'),
       eval_type=config.get('eval_type'),
       eval_bsize=config.get('eval_bsize'),
-      verbose=True)
+      verbose=True,
+    )
     print(f"result: {res:.4f}")
+
+if __name__ == '__main__': main()

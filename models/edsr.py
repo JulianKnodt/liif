@@ -115,7 +115,7 @@ def make_edsr_baseline(
 @register('edsr-small')
 def make_edsr_baseline(
   n_resblocks=16,
-  n_feats=30,
+  n_feats=64,
   res_scale=1,
   scale=2,
   no_upsampling=True,

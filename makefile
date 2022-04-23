@@ -4,9 +4,6 @@ clean:
 train-div2k:
 	python3 train_liif.py --config configs/train-div2k/train_edsr-baseline-liif.yaml
 
-train-div2k-small:
-	python3 train_liif.py --config configs/train-div2k/train_edsr-liif-small.yaml
-
 # lower memory usage?
 test-div2k-4: clean
 	python3 test.py --config configs/test/test-div2k-4.yaml \
@@ -17,7 +14,3 @@ test-div2k-2: clean
 	python3 test.py --config configs/test/test-div2k-2.yaml \
     --model save/_train_edsr-baseline-liif/epoch-best.pth
 
-encode-sample:
-	python3 encode_video.py --model save/_train_edsr-baseline-liif/epoch-best.pth \
-  --hdr /home/kadmin/nerf_atlas/data/video/shoichi_chris.mp4 --resize-w 480 --resize-h 270 \
-  --device cpu

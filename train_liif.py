@@ -79,8 +79,8 @@ def fft_loss(x, ref):
 
 def train(train_loader, model, opt):
   model.train()
-  def loss_fn(x, ref): return (fft_loss(x, ref) + F.l1_loss(x, ref))/2
-  loss_fn = fft_loss
+  #loss_fn = fft_loss
+  loss_fn = F.mse_loss
   train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']

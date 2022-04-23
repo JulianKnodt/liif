@@ -10,7 +10,7 @@ train_dataset:
       inp_size: 48
       scale_max: 4
       augment: true
-      sample_q: 800
+      sample_q: 1600
   batch_size: 12
 val_dataset:
   dataset:
@@ -48,14 +48,14 @@ model:
     imnet_spec:
       name: mlp
       args:
-        hidden_list:
+        hidden_sizes:
         - 256
         - 256
         - 256
 optimizer:
   name: adam
   args:
-    lr: 0.0001
+    lr: 0.0003
 epoch_max: 1000
 multi_step_lr:
   milestones:
@@ -66,4 +66,4 @@ multi_step_lr:
   gamma: 0.5
 epoch_val: 1
 epoch_save: 100
-resume: /home/kadmin/projects/super_res_streaming/liif/save/_train_edsr-baseline-liif/epoch-best.pth
+resume: save/_train_edsr-baseline-liif/epoch-best.pth

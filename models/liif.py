@@ -8,6 +8,62 @@ from utils import make_coord
 
 def fat_tanh(v, eps:float=1e-2): return v.tanh() * (1 + eps)
 
+# Conditionally zeros out the last components of a vector
+class StructuredDropout(nn.Module):
+  def __init__(
+    self,
+    # chance of turning off bits.
+    p=0.5,
+    # the minimum number of features to always retain
+    lower_bound:int=1,
+    eval_size=None,
+    zero_pad:bool = False,
+
+    step:int=1,
+  ):
+    assert(p >= 0)
+    assert(p <= 1)
+    assert(step >= 1)
+    assert(lower_bound > 0), "Cannot use 0 or below as lower bound"
+
+    super().__init__()
+    self.p = p
+    self.step = step
+    self.lower_bound = lower_bound
+    self.eval_size = eval_size
+
+    self.zero_pad = zero_pad
+
+  def forward(self, x):
+    p = self.p
+    upper = x.shape[-1]
+
+    if not self.training:
+      esz = self.eval_size
+      if esz is None or esz >= upper: return x
+
+      cut = (upper/esz) * x[..., :esz]
+      return cut if not self.zero_pad else F.pad(cut, (0,upper-esz))
+
+    cutoff = self.cutoff(upper)
+    if cutoff is None: return x
+
+    cut = (upper/cutoff) * x[..., :cutoff]
+    return cut if not self.zero_pad else F.pad(cut, (0, upper-cutoff))
+
+  def set_latent_budget(self, ls:int): self.eval_size = ls
+  def cutoff(self, upper):
+    if random.random() > self.p or self.lower_bound >= upper: return None
+    return random.choice(range(self.lower_bound, upper, self.step))
+  # Apply the linear layer that precedes x more cheaply.
+  def pre_apply_linear(self, lin, x, output_features:int):
+    cutoff = self.cutoff(output_features) if self.training else self.eval_size
+
+    if cutoff is None: return lin(x)
+
+    bias = None if lin.bias is None else lin.bias[:cutoff]
+    return F.linear(x, lin.weight[:cutoff], bias) * output_features/cutoff
+
 @register('liif')
 class LIIF(nn.Module):
     def __init__(
@@ -24,6 +80,7 @@ class LIIF(nn.Module):
       self.cell_decode = cell_decode
 
       self.encoder = models.make(encoder_spec)
+      self.feat_dropout = StructuredDropout(p=0.5, zero_pad=True)
       # Just a standard MLP usually, altho I added skip connections for fun.
       self.imnet = models.make(imnet_spec)
 
