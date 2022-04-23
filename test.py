@@ -1,6 +1,7 @@
 import argparse
 import os
 import math
+import time
 from functools import partial
 
 import yaml
@@ -11,6 +12,7 @@ from tqdm import tqdm
 import datasets
 import models
 import utils
+import plotting_utils
 
 
 def batched_predict(model, inp, coord, cell, bsize):
@@ -139,14 +141,24 @@ def main():
   print("[note]: loaded model")
 
   with torch.no_grad():
-    res = eval_psnr(
-      loader,
-      model,
-      data_norm=config.get('data_norm'),
-      eval_type=config.get('eval_type'),
-      eval_bsize=config.get('eval_bsize'),
-      verbose=True,
-    )
-    print(f"result: {res:.4f}")
+    budgets = range(1, 64, 8)
+    accs = []
+    times = []
+    for i, budget in tqdm(budgets):
+      model.feat_dropout.set_latent_budget(budget)
+      start = time.time()
+      acc = eval_psnr(
+        loader,
+        model,
+        data_norm=config.get('data_norm'),
+        eval_type=config.get('eval_type'),
+        eval_bsize=config.get('eval_bsize'),
+        verbose=True,
+      )
+      times.append(time.time() - start)
+      accs.append(acc)
+      print(f"PSNR ({i}): {res:.4f}")
+    plotting_utils.plot_budgets(budgets, accs)
+    plotting_utils.plot_timing(budgets, times)
 
 if __name__ == '__main__': main()

@@ -124,7 +124,11 @@ def train(train_loader, model, opt):
       opt.step()
       opt.zero_grad()
 
-    progress.set_postfix(L=train_loss.item(), mse=total_loss)
+    progress.set_postfix(
+      L=train_loss.item(),
+      mse=total_loss,
+      LR=f"{opt.param_groups[0]['lr']:.01e}"
+    )
   return train_loss.item()
 
 
