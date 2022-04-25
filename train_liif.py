@@ -77,7 +77,7 @@ def fft_loss(x, ref):
   exp = torch.fft.rfft2(ref, dim=(-3, -2), norm="ortho")
   return (got - exp).abs().mean()
 
-def train(train_loader, model, opt):
+def train(train_loader, model, opt, epoch):
   model.train()
   loss_fn = F.mse_loss
   train_loss = utils.MovingAverager()
@@ -113,7 +113,8 @@ def train(train_loader, model, opt):
     progress.set_postfix(
       L=train_loss.item(),
       mse=total_loss,
-      LR=f"{opt.param_groups[0]['lr']:.01e}"
+      LR=f"{opt.param_groups[0]['lr']:.01e}",
+      epoch=epoch,
     )
   return train_loss.item()
 
@@ -147,7 +148,7 @@ def main(config_, save_path):
       t_epoch_start = timer.t()
       log_info = ['epoch {}/{}'.format(epoch, epoch_max)]
 
-      train_loss = train(train_loader, model, optimizer)
+      train_loss = train(train_loader, model, optimizer, epoch)
       if lr_scheduler is not None: lr_scheduler.step()
 
       log_info.append('train: loss={:.4f}'.format(train_loss))

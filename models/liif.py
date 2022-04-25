@@ -25,11 +25,11 @@ class LIIF(nn.Module):
       self.cell_decode = cell_decode
 
       self.encoder = models.make(encoder_spec)
-      self.feat_dropout = StructuredDropout(p=0.3, zero_pad=True, lower_bound=3)
-      # Just a standard MLP usually, altho I added skip connections for fun.
+      self.feat_dropout = StructuredDropout(p=0.1, zero_pad=True, lower_bound=10)
       self.imnet = models.make(imnet_spec)
 
-    def gen_feat(self, inp): return self.feat_dropout(self.encoder(inp).tanh())
+    def gen_feat(self, inp):
+      return self.feat_dropout(self.encoder(inp).tanh().movedim(1,-1)).movedim(-1,1)
 
     @torch.jit.export
     def query_rgb(self, feat, coord, cell):
@@ -69,14 +69,15 @@ class LIIF(nn.Module):
         mode='nearest',
         align_corners=False,
       )
+
       q_feat = q_feat.permute(2,0,3,1)
       q_feat, q_coord = q_feat[..., :-2], q_feat[..., -2:]
 
       rel_coord = coord[None] - q_coord
       rel_coord[..., 0] *= feat.shape[-2]
       rel_coord[..., 1] *= feat.shape[-1]
-      inp = torch.cat([q_feat, rel_coord], dim=-1)
-      if self.cell_decode: inp = torch.cat([inp, rel_cell[None].expand_as(rel_coord)], dim=-1)
+      inp = torch.cat([rel_coord, q_feat], dim=-1)
+      if self.cell_decode: inp = torch.cat([rel_cell[None].expand_as(rel_coord), inp], dim=-1)
 
       areas = rel_coord.prod(dim=-1, keepdim=True).abs() + 1e-9
       areas = areas/areas.sum(dim=0, keepdim=True)
