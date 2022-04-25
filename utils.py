@@ -20,7 +20,7 @@ class Averager():
   def item(self): return self.v
 
 class MovingAverager():
-  def __init__(self, time_decay=0.8, init=None):
+  def __init__(self, time_decay=0.1, init=None):
     self.decay = time_decay
     self.v = init
 

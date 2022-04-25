@@ -25,12 +25,11 @@ class LIIF(nn.Module):
       self.cell_decode = cell_decode
 
       self.encoder = models.make(encoder_spec)
-      self.feat_dropout = StructuredDropout(p=0.5, zero_pad=True)
+      self.feat_dropout = StructuredDropout(p=0.3, zero_pad=True, lower_bound=3)
       # Just a standard MLP usually, altho I added skip connections for fun.
       self.imnet = models.make(imnet_spec)
 
-    # TODO maybe want to constrain this, so that when encoding we can quantize it better.
-    def gen_feat(self, inp): return self.encoder(inp).tanh()
+    def gen_feat(self, inp): return self.feat_dropout(self.encoder(inp).tanh())
 
     @torch.jit.export
     def query_rgb(self, feat, coord, cell):

@@ -141,10 +141,11 @@ def main():
   print("[note]: loaded model")
 
   with torch.no_grad():
-    budgets = range(1, 64, 8)
+    budgets = range(1, 64, 4)
     accs = []
     times = []
-    for i, budget in tqdm(budgets):
+    for i, budget in tqdm(enumerate(budgets)):
+      print(budget)
       model.feat_dropout.set_latent_budget(budget)
       start = time.time()
       acc = eval_psnr(
@@ -158,7 +159,7 @@ def main():
       times.append(time.time() - start)
       accs.append(acc)
       print(f"PSNR ({i}): {res:.4f}")
+
     plotting_utils.plot_budgets(budgets, accs)
-    plotting_utils.plot_timing(budgets, times)
 
 if __name__ == '__main__': main()

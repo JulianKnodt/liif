@@ -11,8 +11,8 @@ train_dataset:
       inp_size: 48
       scale_max: 4
       augment: true
-      sample_q: 1600
-  batch_size: 12
+      sample_q: 2304
+  batch_size: 16
 
 val_dataset:
   dataset:
@@ -27,8 +27,8 @@ val_dataset:
     args:
       inp_size: 48
       scale_max: 4
-      sample_q: 1000
-  batch_size: 16
+      sample_q: 2304
+  batch_size: 20
 
 data_norm:
   inp: {sub: [0.5], div: [0.5]}
@@ -49,10 +49,10 @@ model:
 optimizer:
   name: adam
   args:
-    lr: 3.e-4
+    lr: 4.e-4
 epoch_max: 1000
 multi_step_lr:
-  milestones: [200, 400, 600, 800]
+  milestones: [25, 50, 75, 100, 125]
   gamma: 0.5
 
 epoch_val: 1

@@ -79,7 +79,6 @@ def fft_loss(x, ref):
 
 def train(train_loader, model, opt):
   model.train()
-  #loss_fn = fft_loss
   loss_fn = F.mse_loss
   train_loss = utils.MovingAverager()
 
@@ -92,8 +91,6 @@ def train(train_loader, model, opt):
   gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
 
   progress = tqdm(train_loader, leave=False, desc='train')
-  opt_step = 1
-  N = opt_step * 2
   for i, batch in enumerate(progress):
     for k, v in batch.items(): batch[k] = v.cuda()
     gt = (batch['gt'] - gt_sub) / gt_div
@@ -101,28 +98,17 @@ def train(train_loader, model, opt):
 
     feat = model.gen_feat(inp)
 
-    # TODO incorporate
-    # https://openreview.net/pdf?id=WA39qkJvLi
-
     # train full model
     pred = model.query_rgb(feat, batch['coord'], batch['cell'])
     loss = loss_fn(pred, gt)
-    loss.div(N).backward(retain_graph=True)
+    loss.backward()
     train_loss.add(loss.item())
 
     total_loss = F.mse_loss(pred, gt).item()
 
-    # train partial model (with zeroed out trailing features)
-    new_feat = feat.clone()
-    assert(feat.shape[1] % 3 == 0)
-    new_feat[:, (random.randint(1, feat.shape[1]//3)*3):] = 0
-    pred = model.query_rgb(new_feat, batch['coord'], batch['cell'])
-    loss_fn(pred, gt).div(N).backward()
-
     # ---
-    if (i+1) % opt_step == 0:
-      opt.step()
-      opt.zero_grad()
+    opt.step()
+    opt.zero_grad()
 
     progress.set_postfix(
       L=train_loss.item(),
