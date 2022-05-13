@@ -11,7 +11,7 @@ train_dataset:
       scale_max: 4
       augment: true
       sample_q: 2304
-  batch_size: 16
+  batch_size: 10
 val_dataset:
   dataset:
     name: image-folder
@@ -52,19 +52,20 @@ model:
         - 256
         - 256
         - 256
+        - 256
 optimizer:
   name: adam
   args:
-    lr: 0.0004
+    lr: 0.0003
 epoch_max: 1000
 multi_step_lr:
   milestones:
-  - 25
   - 50
-  - 75
   - 100
-  - 125
-  gamma: 0.5
+  - 150
+  - 200
+  - 250
+  gamma: 0.666
 epoch_val: 1
 epoch_save: 100
-resume: save/_train_edsr-baseline-liif/epoch-best.pth
+resume: save/_train_edsr-baseline-liif/epoch-last.pth

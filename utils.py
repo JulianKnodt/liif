@@ -71,12 +71,9 @@ def ensure_path(path, remove=True):
 def compute_num_params(model, text=False):
     tot = int(sum([np.prod(p.shape) for p in model.parameters()]))
     if text:
-        if tot >= 1e6:
-            return '{:.1f}M'.format(tot / 1e6)
-        else:
-            return '{:.1f}K'.format(tot / 1e3)
-    else:
-        return tot
+      if tot >= 1e6: return f'{tot/1e6:.1f}M'
+      else: return f'{tot/1e3:.1f}K'
+    return tot
 
 
 def make_optimizer(param_list, optimizer_spec, load_sd=False):
@@ -85,8 +82,9 @@ def make_optimizer(param_list, optimizer_spec, load_sd=False):
         'adam': Adam
     }[optimizer_spec['name']]
     optimizer = Optimizer(param_list, **optimizer_spec['args'])
-    if load_sd:
-        optimizer.load_state_dict(optimizer_spec['sd'])
+    if load_sd: optimizer.load_state_dict(optimizer_spec['sd'])
+    # manually set lr
+    for g in optimizer.param_groups: g["lr"] = 1e-4
     return optimizer
 
 
@@ -95,12 +93,9 @@ def make_coord(h:int, w:int, flatten:bool=True):
     """
     coord_seqs = []
     for n in [h,w]:
-        #v0, v1 = (-1, 1)
-        #r = (v1 - v0) / (2 * n)
-        r = 1/n
-        #seq = v0 + r + (2 * r) * torch.arange(n).float()
-        seq = -1 + r + (2 * r) * torch.arange(n).float()
-        coord_seqs.append(seq)
+      r = 1/n
+      seq = -1 + r + (2 * r) * torch.arange(n, dtype=torch.float)
+      coord_seqs.append(seq)
     ret = torch.stack(torch.meshgrid(coord_seqs[0], coord_seqs[1], indexing="ij"), dim=-1)
     if flatten: ret = ret.view(-1, ret.shape[-1])
     return ret

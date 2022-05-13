@@ -22,9 +22,12 @@
 """
 
 import argparse
-import os
-
 import yaml
+import os
+import sys
+import math
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -37,6 +40,8 @@ import datasets
 import models
 import utils
 from test import eval_psnr
+
+#torch.autograd.set_detect_anomaly(True)
 
 
 def make_data_loader(spec, tag=''):
@@ -78,8 +83,12 @@ def fft_loss(x, ref):
   return (got - exp).abs().mean()
 
 def train(train_loader, model, opt, epoch):
+  torch.cuda.empty_cache()
+  opt.zero_grad(set_to_none=True)
   model.train()
+
   loss_fn = F.mse_loss
+  #loss_fn = fft_loss
   train_loss = utils.MovingAverager()
 
   data_norm = config['data_norm']
@@ -104,15 +113,17 @@ def train(train_loader, model, opt, epoch):
     loss.backward()
     train_loss.add(loss.item())
 
-    total_loss = F.mse_loss(pred, gt).item()
+    with torch.no_grad():
+      total_loss = F.mse_loss(pred, gt).item()
 
     # ---
     opt.step()
-    opt.zero_grad()
+    opt.zero_grad(set_to_none=True)
 
     progress.set_postfix(
       L=train_loss.item(),
       mse=total_loss,
+      PSNR=-10*math.log10(total_loss),
       LR=f"{opt.param_groups[0]['lr']:.01e}",
       epoch=epoch,
     )
@@ -146,12 +157,10 @@ def main(config_, save_path):
 
     for epoch in range(epoch_start, epoch_max + 1):
       t_epoch_start = timer.t()
-      log_info = ['epoch {}/{}'.format(epoch, epoch_max)]
 
       train_loss = train(train_loader, model, optimizer, epoch)
       if lr_scheduler is not None: lr_scheduler.step()
 
-      log_info.append('train: loss={:.4f}'.format(train_loss))
       model_ = model_.module if n_gpus > 1 else model
       model_spec = config['model']
       model_spec['sd'] = model_.state_dict()
@@ -171,24 +180,25 @@ def main(config_, save_path):
       if (epoch_val is not None) and (epoch % epoch_val == 0):
         model_ = model
         if n_gpus > 1 and (config.get('eval_bsize') is not None): model_ = model.module
-        val_res = eval_psnr(
-          val_loader,
-          model_,
-          data_norm=config['data_norm'],
-          eval_type=config.get('eval_type'),
-          eval_bsize=config.get('eval_bsize')
-        )
-
-        log_info.append(f'val: psnr={val_res:.4f}')
+        with torch.no_grad():
+          val_res = eval_psnr(
+            val_loader,
+            model_,
+            data_norm=config['data_norm'],
+            eval_type=config.get('eval_type'),
+            eval_bsize=config.get('eval_bsize')
+          )
+        print(f'val: psnr={val_res:.4f}')
         if val_res > max_val_v:
           max_val_v = val_res
           torch.save(sv_file, os.path.join(save_path, 'epoch-best.pth'))
+        # If something broke, just restart everything
+        if val_res < 10: os.execv(sys.executable, ['python'] + sys.argv)
 
         t = timer.t()
         prog = (epoch - epoch_start + 1) / (epoch_max - epoch_start + 1)
         t_epoch = utils.time_text(t - t_epoch_start)
         t_elapsed, t_all = utils.time_text(t), utils.time_text(t / prog)
-        log_info.append(f'{t_epoch} {t_elapsed}/{t_all}')
 
 
 if __name__ == '__main__':

@@ -25,34 +25,28 @@ class LIIF(nn.Module):
       self.cell_decode = cell_decode
 
       self.encoder = models.make(encoder_spec)
-      self.feat_dropout = StructuredDropout(p=0.1, zero_pad=True, lower_bound=10)
       self.imnet = models.make(imnet_spec)
 
-    def gen_feat(self, inp):
-      return self.feat_dropout(self.encoder(inp).tanh().movedim(1,-1)).movedim(-1,1)
+    def gen_feat(self, inp): return self.encoder(inp)
 
-    @torch.jit.export
     def query_rgb(self, feat, coord, cell):
-      if self.feat_unfold:
-        f0, f1, f2, f3 = feat.shape
-        feat = F.unfold(feat, 3, padding=1).reshape(f0, f1 * 9, f2, f3)
+      assert(self.feat_unfold)
+      f0, f1, f2, f3 = feat.shape
+      feat = F.unfold(feat, 3, padding=1).reshape(f0, f1 * 9, f2, f3)
 
-      eps = 0.
-      if self.local_ensemble:
-        offsets = torch.tensor([
-          [-1,-1],[-1, 1],[1,-1],[1,1],
-        ], dtype=torch.float, device=coord.device)
-        eps = 1e-6
-      else:
-        offsets = torch.tensor([[0,0]], dtype=torch.float, device=coord.device)
-      rad = torch.tensor([2/r/2 for r in feat.shape[2:]],device=coord.device,dtype=torch.float)
+      assert(self.local_ensemble)
+      offsets = torch.tensor([
+        [-1,-1],[-1, 1],[1,-1],[1,1],
+      ], dtype=torch.float, device=coord.device)
+      eps = 1e-6
+
+      rad = torch.tensor([1/r for r in feat.shape[2:]],device=coord.device,dtype=torch.float)
 
       feat_coord = make_coord(feat.shape[-2], feat.shape[-1], flatten=False)\
         .to(feat.device)\
         .permute(2, 0, 1)[None]\
         .expand(feat.shape[0], 2, feat.shape[-2], feat.shape[-1])
 
-      #if self.cell_decode:
       assert(self.cell_decode)
       rel_cell = cell.clone()
       rel_cell[:, :, 0] *= feat.shape[-2]
@@ -77,12 +71,13 @@ class LIIF(nn.Module):
       rel_coord[..., 0] *= feat.shape[-2]
       rel_coord[..., 1] *= feat.shape[-1]
       inp = torch.cat([rel_coord, q_feat], dim=-1)
-      if self.cell_decode: inp = torch.cat([rel_cell[None].expand_as(rel_coord), inp], dim=-1)
+      assert(self.cell_decode)
+      inp = torch.cat([rel_cell[None].expand_as(rel_coord), inp], dim=-1)
 
-      areas = rel_coord.prod(dim=-1, keepdim=True).abs() + 1e-9
+      areas = rel_coord.prod(dim=-1, keepdim=True).abs() + 1e-6
       areas = areas/areas.sum(dim=0, keepdim=True)
       # Why does this exist?
-      if self.local_ensemble: areas[[0,1,2,3]] = areas[[3,2,1,0]]
+      assert(self.local_ensemble)
+      areas[[0,1,2,3]] = areas[[3,2,1,0]]
       return fat_tanh(self.imnet(inp).mul(areas).sum(dim=0))
-    def forward(self, inp, coord, cell):
-      return self.query_rgb(self.gen_feat(inp), coord, cell)
+    def forward(self, inp, coord, cell): return self.query_rgb(self.gen_feat(inp), coord, cell)

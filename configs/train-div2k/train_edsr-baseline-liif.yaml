@@ -12,7 +12,7 @@ train_dataset:
       scale_max: 4
       augment: true
       sample_q: 2304
-  batch_size: 16
+  batch_size: 10
 
 val_dataset:
   dataset:
@@ -44,17 +44,17 @@ model:
     imnet_spec:
       name: mlp
       args:
-        hidden_sizes: [256,256,256]
+        hidden_sizes: [256,256,256,256]
 
 optimizer:
   name: adam
   args:
-    lr: 4.e-4
+    lr: 3.e-4
 epoch_max: 1000
 multi_step_lr:
-  milestones: [25, 50, 75, 100, 125]
-  gamma: 0.5
+  milestones: [50, 100, 150, 200, 250]
+  gamma: 0.666
 
 epoch_val: 1
 epoch_save: 100
-resume: save/_train_edsr-baseline-liif/epoch-best.pth
+resume: save/_train_edsr-baseline-liif/epoch-last.pth

@@ -52,71 +52,71 @@ def eval_psnr(
   verbose=False,
   save_image=True,
 ):
-    model = model.eval()
+  model = model.eval()
 
-    if data_norm is None:
-      data_norm = {
-        'inp': {'sub': [0], 'div': [1]},
-        'gt': {'sub': [0], 'div': [1]}
-      }
+  if data_norm is None:
+    data_norm = {
+      'inp': {'sub': [0], 'div': [1]},
+      'gt': {'sub': [0], 'div': [1]}
+    }
 
-    t = data_norm['inp']
-    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1).cuda()
-    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1).cuda()
-    t = data_norm['gt']
-    gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
-    gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
+  t = data_norm['inp']
+  inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1).cuda()
+  inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1).cuda()
+  t = data_norm['gt']
+  gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
+  gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
 
-    if eval_type is None: metric_fn = utils.calc_psnr
-    elif eval_type.startswith('div2k'):
-      scale = int(eval_type.split('-')[1])
-      metric_fn = partial(utils.calc_psnr, dataset='div2k', scale=scale)
-    elif eval_type.startswith('benchmark'):
-      scale = int(eval_type.split('-')[1])
-      metric_fn = partial(utils.calc_psnr, dataset='benchmark', scale=scale)
-    else: raise NotImplementedError
+  if eval_type is None: metric_fn = utils.calc_psnr
+  elif eval_type.startswith('div2k'):
+    scale = int(eval_type.split('-')[1])
+    metric_fn = partial(utils.calc_psnr, dataset='div2k', scale=scale)
+  elif eval_type.startswith('benchmark'):
+    scale = int(eval_type.split('-')[1])
+    metric_fn = partial(utils.calc_psnr, dataset='benchmark', scale=scale)
+  else: raise NotImplementedError
 
-    val_res = utils.Averager()
+  val_res = utils.Averager()
 
-    progress = tqdm(loader, leave=False, desc='val')
-    for i, batch in enumerate(progress):
-      for k, v in batch.items():
-        batch[k] = v.cuda()
+  progress = tqdm(loader, leave=False, desc='val')
+  for i, batch in enumerate(progress):
+    for k, v in batch.items():
+      batch[k] = v.cuda()
 
-      inp = (batch['inp'] - inp_sub) / inp_div
-      if eval_bsize is None:
-        with torch.no_grad():
-          pred = model(inp, batch['coord'], batch['cell'])
-      else:
-        pred = batched_predict(model, inp, batch['coord'], batch['cell'], eval_bsize)
-      pred = pred * gt_div + gt_sub
-      pred.clamp_(min=0, max=1)
+    inp = (batch['inp'] - inp_sub) / inp_div
+    if eval_bsize is None:
+      with torch.no_grad():
+        pred = model(inp, batch['coord'], batch['cell'])
+    else:
+      pred = batched_predict(model, inp, batch['coord'], batch['cell'], eval_bsize)
+    pred = pred * gt_div + gt_sub
+    pred.clamp_(min=0, max=1)
 
-      gt = batch['gt']
-      # reshape for shaving-eval
-      if eval_type is not None:
-        ih, iw = batch['inp'].shape[-2:]
-        s = math.sqrt(batch['coord'].shape[1] / (ih * iw))
-        shape = [batch['inp'].shape[0], round(ih * s), round(iw * s), 3]
-        pred = pred.reshape(*shape).permute(0, 3, 1, 2)
-        gt = gt.reshape(*shape).permute(0, 3, 1, 2)
+    gt = batch['gt']
+    # reshape for shaving-eval
+    if eval_type is not None:
+      ih, iw = batch['inp'].shape[-2:]
+      s = math.sqrt(batch['coord'].shape[1] / (ih * iw))
+      shape = [batch['inp'].shape[0], round(ih * s), round(iw * s), 3]
+      pred = pred.reshape(*shape).permute(0, 3, 1, 2)
+      gt = gt.reshape(*shape).permute(0, 3, 1, 2)
 
-      res = metric_fn(pred, gt)
-      val_res.add(res.item(), inp.shape[0])
+    res = metric_fn(pred, gt)
+    val_res.add(res.item(), inp.shape[0])
 
-      if save_image:
-        error = (gt-pred)
-        try:
-          tv.utils.save_image(torch.cat([
-            gt,
-            pred,
-            error.abs().sqrt(),
-          ], dim=0).float(), f"outputs/test_{i:03}.png")
-        except Exception as e:
-          ...
-          #print(f"Failed to save image with shape {pred.shape} for gt shape {gt.shape}: {e}")
-      progress.set_postfix(PSNR=f"{val_res.item():.4f}")
-    return val_res.item()
+    if save_image:
+      error = (gt-pred)
+      try:
+        tv.utils.save_image(torch.cat([
+          gt,
+          pred,
+          error.abs().sqrt(),
+        ], dim=0).float(), f"outputs/test_{i:03}.png")
+      except Exception as e:
+        ...
+        #print(f"Failed to save image with shape {pred.shape} for gt shape {gt.shape}: {e}")
+    progress.set_postfix(PSNR=f"{val_res.item():.4f}")
+  return val_res.item()
 
 
 def main():
@@ -141,12 +141,16 @@ def main():
   print("[note]: loaded model")
 
   with torch.no_grad():
-    budgets = range(1, 64, 4)
+    budgets = range(32, 256+1, 4)
+    plotting_utils.plot_number_parameters(
+      budgets,
+      [model.imnet.number_inference_parameters(b) for b in budgets],
+      title="LIIF",
+    )
     accs = []
-    times = []
-    for i, budget in tqdm(enumerate(budgets)):
-      print(budget)
-      model.feat_dropout.set_latent_budget(budget)
+    durs = []
+    for budget in budgets:
+      model.imnet.dropout.set_latent_budget(budget)
       start = time.time()
       acc = eval_psnr(
         loader,
@@ -156,10 +160,14 @@ def main():
         eval_bsize=config.get('eval_bsize'),
         verbose=True,
       )
-      times.append(time.time() - start)
+      end_time = time.time() - start
       accs.append(acc)
-      print(f"PSNR ({i}): {res:.4f}")
+      print(f"PSNR (budget={budget}): acc={acc:.4f}, time={end_time:.4f}")
+      durs.append(end_time)
 
-    plotting_utils.plot_budgets(budgets, accs)
+    plotting_utils.plot_budgets(
+      budgets, accs, ylabel="PSNR (dB)", p=0.5, title="LIIF (x4 Resize)", mul=1
+    )
+    print(durs)
 
 if __name__ == '__main__': main()

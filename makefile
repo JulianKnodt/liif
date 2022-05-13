@@ -9,6 +9,10 @@ test-div2k-4: clean
 	python3 test.py --config configs/test/test-div2k-4.yaml \
     --model save/_train_edsr-baseline-liif/epoch-best.pth
 
+test-div2k-4-latest: clean
+	python3 test.py --config configs/test/test-div2k-4.yaml \
+    --model save/_train_edsr-baseline-liif/epoch-last.pth
+
 # higher memory usage?
 test-div2k-2: clean
 	python3 test.py --config configs/test/test-div2k-2.yaml \
